@@ -1,0 +1,8 @@
+SECTION ONE:
+PRINT "HELLO, WORLD"
+INPUT "DO YOU WANT TO SEE MORE?" TO check
+IF check = "yes"
+# GOTO will be able to do maths stuff too
+% Comments with percent too!
+GOTO SECTION ONE
+END IF
