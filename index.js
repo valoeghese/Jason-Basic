@@ -34,17 +34,26 @@ async function run(procedure) {
 	labels = {};
 	instructions = [];
 
-	while (i < procedure.length) {
-		decodedInstr = instructions[i];
-		console.log(i);
+	function fetchInstruction() {
+		let instr = instructions[i];
+		//console.log(i);
 		
-		if (decodedInstr == undefined) {
-			decodedInstr = decode(i, procedure[i].trim(), labels);
-			instructions[i] = decodedInstr;
+		if (instr == undefined) {
+			instr = decode(i, procedure[i].trim());
+			instructions[i] = instr;
 		}
+
+		return instr;
+	}
+
+	while (i < procedure.length) {
+		let decodedInstr = fetchInstruction();
 
 		if (decodedInstr) {
 			switch (decodedInstr.instruction) {
+				case "LABEL":
+					labels[decodedInstr.label] = decodedInstr.line;
+					break;
 				case "PRINT":
 					console.log(decodedInstr.expression(variables));
 					break;
@@ -62,27 +71,45 @@ async function run(procedure) {
 						// decode label to line
 						linenum = labels[decodedInstr.label];
 
-						if (linenum) {
+						if (linenum != undefined) {
 							decodedInstr.lineBefore = linenum - 1; // thought this was neater than continue
 							i = decodedInstr.lineBefore;
 							console.log("asbawrberbaer", i);
 						}
 						else {
-							// scan
-							// TODO
-							console.log("ebebsebse");
+							// scan along code until we find the label
+							while (true) {
+								i++;
+
+								// catch it before it runs off the end
+								if (i == procedure.length) {
+									throw exception(i, "Could not find label \"" + decodedInstr.label + '"');
+								}
+
+
+								decodedInstr = fetchInstruction();
+
+								if (decodedInstr && decodedInstr.instruction == "LABEL") {
+									labels[decodedInstr.label] = decodedInstr.line;
+									break; // continue normally
+								}
+							}
 						}
 					}
 					break;
+				case "TERMINATE":
+					process.exit();
+					break;
 				default:
 					console.error("Could not handle instruction type \"" + decodedInstr.instruction + "\"...");
+					break;
 			}
 		}
 		
 		i++;
 	}
 
-	console.log(variables);
+	//console.log(variables);
 }
 
 function exception(lineNum, msg) {
@@ -224,10 +251,9 @@ function simpleExpression(lnm, keyword, expression) {
 // Parameters
 // - lnm = line number (0-indexed)
 // - instruction = the instruction on that line
-// - labels (WRITE) = the labels map. can be written to.
 // Returns
 // - the parsed executable instruction
-function decode(lnm, instruction, labels) {
+function decode(lnm, instruction) {
 	// empty lines and comments are No-Op
 	// comments can be done with #, %, or //
 	// or with the REM keyword which is also reserved.
@@ -246,8 +272,7 @@ function decode(lnm, instruction, labels) {
 		let labelName = instruction.slice(0, instruction.length - 1).trim();
 
 		if (LABEL_REGEX.test(labelName)) {
-			labels[labelName] = lnm;
-			return null; // no-op line, merely a label definition.
+			return {"instruction": "LABEL", "label": labelName, "line": lnm}; // no-op line, merely a label definition for later jumping.
 		}
 		else {
 			throw exception(lnm, "Invalid label \"" + labelName + "\". Only A-z, 0-9, and space characters are permitted!")

@@ -1,8 +1,10 @@
 SECTION ONE:
 PRINT "\"Hello, World!\" this, \"Hello, World!\" that! Can't they be a bit more creative..."
+#GOTO SECTION TWO
 INPUT "DO YOU WANT TO SEE MORE? " TO check
 IF check = "yes"
 # GOTO will be able to do maths stuff too
 % Comments with percent too!
 GOTO SECTION ONE
 END IF
+SECTION TWO:
