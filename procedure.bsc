@@ -1,6 +1,6 @@
 SECTION ONE:
-PRINT "HELLO, WORLD"
-INPUT "DO YOU WANT TO SEE MORE?" TO check
+PRINT "\"Hello, World!\" this, \"Hello, World!\" that! Can't they be a bit more creative..."
+INPUT "DO YOU WANT TO SEE MORE? " TO check
 IF check = "yes"
 # GOTO will be able to do maths stuff too
 % Comments with percent too!
