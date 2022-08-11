@@ -29,81 +29,97 @@ String.prototype.splitOnce = function(on) {
 // i comment my code very well thank you
 
 async function run(procedure) {
+	let variables = {};
+	let instructions = [];
+	let labels = {};
+
+	// decode into interpretable instructions
+	// pseudocompilation
 	let i = 0;
-	variables = {};
-	labels = {};
-	instructions = [];
+	let decode_Globals = {}; // for keeping track of stuff line-to-line for this procedure purely from decode
 
-	function fetchInstruction() {
-		let instr = instructions[i];
-		//console.log(i);
-		
-		if (instr == undefined) {
-			instr = decode(i, procedure[i].trim());
-			instructions[i] = instr;
-		}
-
-		return instr;
-	}
+	console.log("Parsing...");
 
 	while (i < procedure.length) {
-		let decodedInstr = fetchInstruction();
+		let decoded = decode(i + 1, procedure[i].trim(), decode_Globals); // decode into list of instructions
+		instructions.push.apply(instructions, decoded); // append
+		i++; // increment index
+	}
 
-		if (decodedInstr) {
-			switch (decodedInstr.instruction) {
-				case "LABEL":
-					labels[decodedInstr.label] = decodedInstr.line;
-					break;
-				case "PRINT":
-					console.log(decodedInstr.expression(variables));
-					break;
-				case "INPUT_DISCARD":
-					await queryStdin(decodedInstr.expression(variables));
-					break;
-				case "INPUT":
-					variables[decodedInstr.var] = await queryStdin(decodedInstr.expression(variables));
-					break;
-				case "JUMP":
-					if (decodedInstr.lineBefore) {
-						i = decodedInstr.lineBefore;
+	i = 0; // rewind for labling
+	console.log("Indexing Labels...");
+
+	// assign labels
+	// done separately for cleanliness
+	while (i < instructions.length) {
+		let instruction = instructions[i];
+
+		if (instruction.type == "LABEL") {
+			if (labels[instruction.label] == undefined) {
+				labels[instruction.label] = i; // current index
+			}
+			else {
+				throw exception(instruction.line, "Duplicate label " + instruction.label);
+			}
+		}
+
+		i++;
+	}
+
+	i = 0; // rewind again, this time for execution
+	console.log(instructions);
+	console.log("====================")
+
+	while (i < instructions.length) {
+		let instruction = instructions[i];
+
+		switch (instruction.type) {
+			case "LABEL":
+				// labels are handled prior to execution
+				break;
+			case "PRINT":
+				console.log(instruction.expression(variables));
+				break;
+			case "INPUT_DISCARD":
+				await queryStdin(instruction.expression(variables));
+				break;
+			case "INPUT":
+				variables[instruction.var] = await queryStdin(instruction.expression(variables));
+				break;
+			case "JUMP":
+				jmpIndex = labels[instruction.label];
+
+				if (jmpIndex != undefined) {
+					i = jmpIndex - 1; // thought this was neater than continue;
+				}
+				else {
+					throw exception(instruction.line, "Unknown label \"" + instruction.label + '"');
+				}
+				break;
+			case "JUMP_IF": // unused but kept just in case tm
+			case "JUMP_IFN": // used in if statements
+				let b = instruction.expression(variables);
+
+				// swap for 'jump if not'
+				if (instruction.type == "JUMP_IFN") b = !b;
+
+				if (b) { // check
+					jmpIndex = labels[instruction.label];
+
+					if (jmpIndex != undefined) {
+						i = jmpIndex - 1; // thought this was neater than continue;
 					}
 					else {
-						// decode label to line
-						linenum = labels[decodedInstr.label];
-
-						if (linenum != undefined) {
-							decodedInstr.lineBefore = linenum - 1; // thought this was neater than continue
-							i = decodedInstr.lineBefore;
-							console.log("asbawrberbaer", i);
-						}
-						else {
-							// scan along code until we find the label
-							while (true) {
-								i++;
-
-								// catch it before it runs off the end
-								if (i == procedure.length) {
-									throw exception(i, "Could not find label \"" + decodedInstr.label + '"');
-								}
-
-
-								decodedInstr = fetchInstruction();
-
-								if (decodedInstr && decodedInstr.instruction == "LABEL") {
-									labels[decodedInstr.label] = decodedInstr.line;
-									break; // continue normally
-								}
-							}
-						}
+						throw exception(instruction.line, "Unknown label \"" + instruction.label + '"');
 					}
-					break;
-				case "TERMINATE":
-					process.exit();
-					break;
-				default:
-					console.error("Could not handle instruction type \"" + decodedInstr.instruction + "\"...");
-					break;
-			}
+				}
+				break;
+			case "TERMINATE":
+				process.exit();
+				break;
+			default:
+				console.error("Could not handle instruction type \"" + instruction.type + "\"...");
+				break;
 		}
 		
 		i++;
@@ -113,18 +129,16 @@ async function run(procedure) {
 }
 
 function exception(lineNum, msg) {
-	lineNum += 1; // translate from interpreter lines to true lines.
 	return "EXCEPTION at line " + lineNum + ":\n>> " + msg;
 }
 
 const IDENTIFIER_START_REGEX = /[A-z]/;
 const IDENTIFIER_CHAR_REGEX = /[A-z0-9]/;
-const SPACE_OPERATORS_REGEX = /[\t \+\-\*\/!&|=]/;
-const BRACKETS_OPERATORS_REGEX = /[\(\)\+\-\*\/!&|=]/;
+const SPACE_OPERATORS_REGEX = /[\t \+\-\*\/\!\&\|\=]/;
+const BRACKETS_OPERATORS_REGEX = /[\(\)\+\-\*\/\!\&\|\=]/;
 const NUMBERS_REGEX = /[0-9]/;
 
 const IDENTIFIER_REGEX = /[A-z][A-z0-9]*/;
-const SAFE_MATHS_CHARS_REGEX = /[\+\-\*\/ 0-9\(\)!&|]+/;
 
 // expression translator to js
 // what are you talking about, unsafely using eval? who could ever
@@ -141,13 +155,17 @@ function compileExpression(lnm, tokens) {
 			throw exception(lnm, "Unexpected keyword \"" + token.value + '"');
 		}
 		else if (token.type == "OPERATOR") {
-			jsExpression += token.value;
+			if (/[\&\|\=]/.test(token.value)) {
+				jsExpression += token.value + token.value;
+			} else {
+				jsExpression += token.value;
+			}
 		}
 		else if (token.type == "STRING") {
 			jsExpression += '"' + token.value + '"';
 		}
 		else if (token.type == "VAR") {
-			jsExpression += "vars[" + token.value + "]";
+			jsExpression += "vars[\"" + token.value + "\"]";
 		}
 
 		jsExpression += " ";
@@ -246,20 +264,25 @@ function translateExpression(lnm, expression) {
 
 // a common operation
 function simpleExpression(lnm, keyword, expression) {
-	return {"instruction": keyword, "expression": translateExpression(lnm, expression)};
+	return [{"type": keyword, "line": lnm, "expression": translateExpression(lnm, expression)}];
 }
 // Parameters
 // - lnm = line number (0-indexed)
 // - instruction = the instruction on that line
+// - globals (READ/WRITE) = a map shared across the compilation of a procedure, to keep track of state
 // Returns
 // - the parsed executable instruction
-function decode(lnm, instruction) {
+function decode(lnm, instruction, globals) {
+	// initialise globals if first time
+	if (globals.ifstack == undefined) globals.ifstack = []; // if stack
+	if (globals.ifid == undefined) globals.ifid = 0; // free if id tracker, for sections
+
 	// empty lines and comments are No-Op
 	// comments can be done with #, %, or //
 	// or with the REM keyword which is also reserved.
 	// Also inline comments are not supported
 	if (instruction.length == 0 || instruction[0] == '#' || instruction[0] == '%' || (instruction.length > 1 && instruction[0] == '/' && instruction[1] == '/')) {
-		return null;
+		return [];
 	}
 
 	// who needs tokenisers anyway
@@ -272,7 +295,7 @@ function decode(lnm, instruction) {
 		let labelName = instruction.slice(0, instruction.length - 1).trim();
 
 		if (LABEL_REGEX.test(labelName)) {
-			return {"instruction": "LABEL", "label": labelName, "line": lnm}; // no-op line, merely a label definition for later jumping.
+			return [{"type": "LABEL", "label": labelName, "line": lnm}]; // no-op line, merely a label definition for later jumping.
 		}
 		else {
 			throw exception(lnm, "Invalid label \"" + labelName + "\". Only A-z, 0-9, and space characters are permitted!")
@@ -287,7 +310,7 @@ function decode(lnm, instruction) {
 	// todo does javascript have formatting. if so how do we stop them exploiting it. ig escape stuff
 	switch (splitInstr[0]) {
 		case "REM":
-			return null; // comment 2 electric boogaloo
+			return []; // comment 2 electric boogaloo
 		case "PRINT":
 			if (expression == '') throw exception(lnm, "PRINT requires an operand but none given!");
 			return simpleExpression(lnm, "PRINT", expression);
@@ -305,7 +328,7 @@ function decode(lnm, instruction) {
 				}
 			}
 
-			if (toIndex == -1) return {"instruction": "INPUT_DISCARD", "expression": compileExpression(lnm, tokens)};
+			if (toIndex == -1) return [{"type": "INPUT_DISCARD", "line": lnm, "expression": compileExpression(lnm, tokens)}];
 
 			let spliced = tokens.splice(0, toIndex);
 			//console.log(spliced);
@@ -320,22 +343,50 @@ function decode(lnm, instruction) {
 
 			if (variable.type != "VAR") throw exception(lnm, "Operand after INPUT ... TO is not a valid variable name!");
 
-			return {"instruction": "INPUT", "expression": compiledExpression, "var": variable.value};
+			return [{"type": "INPUT", "line": lnm, "expression": compiledExpression, "var": variable.value}];
 		case "GOTO":
 			if (expression == '') throw exception(lnm, "GOTO requires a label but none given!");
-			return {"instruction": "JUMP", "label": expression};
+			return [{"type": "JUMP", "line": lnm, "label": expression}];
 		case "IF":
 			if (expression == '') throw exception(lnm, "IF requires an operand but none given!");
-			return simpleExpression(lnm, "IF", expression);
+			ifJmp = simpleExpression(lnm, "JUMP_IFN", expression);
+			
+			ifJmp[0].label = "@IF" + (globals.ifid++); // set to current and increment to next free one. @ for synthetic sections as it's an invalid label character
+			globals.ifstack.push(ifJmp[0]); // push this onto the if stack
+			return ifJmp;
 		case "ELSE":
-			if (expression == '') return {"instruction": "ELSE"};
+			if (expression == '') {
+				if (globals.ifstack.length == 0) {
+					throw exception(lnm, "ELSE with no matching IF!");
+				}
+
+				// switchemeroo
+				// pop the if statement and set its label target to here, and place this one on the if stack here as a JUMP
+				// make sure to put the JUMP before the else label as if jumps before it reaches else label
+				let ifToElse = globals.ifstack.pop();
+				let elseJmp = {"type": "JUMP", "line": lnm, "label": "ELSE" + ifToElse.label}; // see comment above and/or comments on return for more detail
+				globals.ifstack.push(elseJmp); // push else as an imposter onto the if stack (sus)
+
+				return [
+					elseJmp, // eg if the if is @IF1, the matching else is ELSE@IF1. This jumps away from else execution
+					{"type": "LABEL", "line": lnm, "label": ifToElse.label} // the if statement's jump for if false, aka this is where to start else execution
+				];
+			}
 			else throw exception(lnm, "ELSE does not take any operands!");
 		case "END":
 			switch (expression) {
 				case "":
-					return {"instruction": "TERMINATE"};
+					return {"type": "TERMINATE", "line": lnm};
 				case "IF":
-					return {"instruction": "END IF"}; // the jump target for an if ending with an else, or an if with no else
+					// cannot end if if there's no if
+					if (globals.ifstack.length == 0) {
+						throw exception(lnm, "Ending if when there's no matching IF to end!");
+					}
+
+					let ifToEnd = globals.ifstack.pop();
+					// create label to jump to for 'else'. If the if has an else block we've done earlier the hack of replacing the item on the if stack with an else jump after setting the real if to the else. Little switchermeroo.
+
+					return [{"type": "LABEL", "line": lnm, "label": ifToEnd.label}]; // the jump target for an if ending with an else, or an if with no else
 				default:
 					throw exception(lnm, "Unknown block construction \"" + expression + '"');
 			}
