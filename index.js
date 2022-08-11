@@ -67,7 +67,6 @@ async function run(procedure) {
 	}
 
 	i = 0; // rewind again, this time for execution
-	console.log(instructions);
 	console.log("====================")
 
 	while (i < instructions.length) {
