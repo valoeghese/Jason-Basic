@@ -23,7 +23,8 @@ function queryStdin(query) {
 // This always returns a size-2 array of strings
 String.prototype.splitOnce = function(on) {
 	let i = this.indexOf(on);
-	return [this.slice(0, i), this.slice(i + 1)];
+	// handle the case that the character is not present
+	return i == -1 ? [this.slice(0, this.length), ""] : [this.slice(0, i), this.slice(i + 1)];
 };
 
 // i comment my code very well thank you
@@ -36,13 +37,36 @@ async function run(procedure) {
 	// decode into interpretable instructions
 	// pseudocompilation
 	let i = 0;
-	let decode_Globals = {}; // for keeping track of stuff line-to-line for this procedure purely from decode
+	let decode_Globals = {}; // for keeping track of state line-to-line for this procedure purely from decode
 
 	console.log("Parsing...");
 
+	function vars2str(vars) {
+		result = "";
+
+		for (let key in vars) {
+			result += key + "=" + vars[key] + ", ";
+		}
+
+		if (result != "") {
+			result = result.substring(0, result.length - 2);// cut off last ", "
+		}
+
+		return result;
+	}
+
 	while (i < procedure.length) {
-		let decoded = decode(i + 1, procedure[i].trim(), decode_Globals); // decode into list of instructions
+		let line = procedure[i].trim();
+
+		// handle breakpoints first. done by placing * at the end of a line. breaks BEFORE the line.
+		if (line[line.length - 1] == '*') {
+			instructions.push({"type": "INPUT_DISCARD", "line": i + 1, "expression": vars => "Breakpoint @ line " + (i + 1) + ", " + vars2str(vars)});
+			line = line.substring(0, line.length - 1); // remove the * at the end for main decoding
+		}
+
+ 		let decoded = decode(i + 1, line, decode_Globals); // decode into list of instructions
 		instructions.push.apply(instructions, decoded); // append
+
 		i++; // increment index
 	}
 
@@ -66,6 +90,7 @@ async function run(procedure) {
 		i++;
 	}
 
+	//console.log(instructions);
 	i = 0; // rewind again, this time for execution
 	console.log("====================")
 
@@ -113,6 +138,9 @@ async function run(procedure) {
 					}
 				}
 				break;
+			case "VAR":
+				variables[instruction.var] = instruction.expression(variables);
+				break;
 			case "TERMINATE":
 				process.exit();
 				break;
@@ -128,16 +156,17 @@ async function run(procedure) {
 }
 
 function exception(lineNum, msg) {
-	return "EXCEPTION at line " + lineNum + ":\n>> " + msg;
+	return "Exception at line " + lineNum + ":\n>> " + msg;
 }
 
 const IDENTIFIER_START_REGEX = /[A-z]/;
-const IDENTIFIER_CHAR_REGEX = /[A-z0-9]/;
-const SPACE_OPERATORS_REGEX = /[\t \+\-\*\/\!\&\|\=]/;
-const BRACKETS_OPERATORS_REGEX = /[\(\)\+\-\*\/\!\&\|\=]/;
-const NUMBERS_REGEX = /[0-9]/;
+const IDENTIFIER_CHAR_REGEX = /[A-z0-9_]/;
+const IDENTIFIER_REGEX = /[A-z][A-z0-9_]*/;
 
-const IDENTIFIER_REGEX = /[A-z][A-z0-9]*/;
+const SPACE_OPERATORS_REGEX = /[\t \+\-\*\/\!\&\|\=\>\<\%]/;
+const BRACKETS_OPERATORS_REGEX = /[\(\)\+\-\*\/\!\&\|\=\>\<\%]/;
+const SPACE_BRACKETS_OPERATORS_REGEX = /[\t \(\)\+\-\*\/\!\&\|\=\>\<\%]/;
+const NUMBERS_REGEX = /[0-9]/;
 
 // expression translator to js
 // what are you talking about, unsafely using eval? who could ever
@@ -166,6 +195,9 @@ function compileExpression(lnm, tokens) {
 		else if (token.type == "VAR") {
 			jsExpression += "vars[\"" + token.value + "\"]";
 		}
+		else if (token.type == "NUMBER") {
+			jsExpression += token.value;
+		}
 
 		jsExpression += " ";
 	}
@@ -179,7 +211,8 @@ function tokenise(lnm, expression) {
 	let tokens = [];
 	let varIndex = -1; // for slicing
 	let stringMode = 0; // 1 = string, 2 = escape
-	let stringAccumulator = ""; // for accumulating strings
+	let numberMode = 0; // literally stringmode for numbers. 1 = can tolerate a decimal point, 2 = cannot tolerate one anymore
+	let stringAccumulator = ""; // for accumulating strings or numbers
 
 	for (let i = 0; i < expression.length; i++) {
 		let c = expression[i]; // current char
@@ -203,6 +236,32 @@ function tokenise(lnm, expression) {
 				stringAccumulator += c;
 			}
 		}
+		else if (numberMode) {
+			if (NUMBERS_REGEX.test(c)) {
+				stringAccumulator += c;
+			}
+			else if (c == '.') {
+				// decimal point only once!
+				// tracked in the number mode
+				if (numberMode == 2) {
+					throw exception(lnm, "A number cannot have two decimal points!");
+				}
+				else {
+					numberMode = 2;
+					stringAccumulator += c;
+				}
+			}
+			else if (SPACE_BRACKETS_OPERATORS_REGEX) {
+				// number ends
+				tokens.push({"type": "NUMBER", "value": stringAccumulator});
+				// reset number info to prepare for future use
+				stringAccumulator = "";
+				numberMode = 0;
+			}
+			else {
+				throw exception(lnm, "Unexpected character while parsing number: \"" + c + '"');
+			}
+		}
 		else if (varIndex > -1) {
 			if (!IDENTIFIER_CHAR_REGEX.test(c)) {
 				if (SPACE_OPERATORS_REGEX.test(c)) {
@@ -211,7 +270,7 @@ function tokenise(lnm, expression) {
 					i--; // take another look at the operator under a... different lens ;)
 				}
 				else {
-					throw exception(lnm, "Unexpected character \"" + c + '"');
+					throw exception(lnm, "Unexpected character while parsing variable name: \"" + c + '"');
 				}
 			}
 		}
@@ -228,8 +287,12 @@ function tokenise(lnm, expression) {
 			else if (c == '"') {
 				stringMode = 1;
 			}
+			else if (NUMBERS_REGEX.test(c)) {
+				numberMode = 1;
+				i--; // rewind to get the number mode parser to read that instead (to prevent spaghetti by fracturing the parsers for each type)
+			}
 			else {
-				throw exception(lnm + 1, "Unexpected character \"" + c + '"');
+				throw exception(lnm, "Unexpected character \"" + c + '"');
 			}
 		}
 	}
@@ -242,6 +305,11 @@ function tokenise(lnm, expression) {
 	// push any variables still being accumulated
 	if (varIndex > -1) {
 		tokens.push({"type": "VAR", "value": expression.slice(varIndex, expression.length)});
+	}
+
+	// push any numbers still being accumulated
+	if (numberMode) {
+		tokens.push({"type": "NUMBER", "value": stringAccumulator});
 	}
 
 	// detect keywords
@@ -302,6 +370,24 @@ function decode(lnm, instruction, globals) {
 	}
 
 	let splitInstr = instruction.splitOnce(" ");
+
+	if (splitInstr[1][0] == "=") {
+		// treat as assignment
+		let expression = splitInstr[1].substring(1).trim();
+		
+		if (KEYWORDS.indexOf(splitInstr[0]) == -1) {
+			if (IDENTIFIER_REGEX.test(splitInstr[0])) {
+				return [{"type": "VAR", "line": lnm, "var": splitInstr[0], "expression": translateExpression(lnm, expression)}];
+			}
+			else {
+				throw exception(lnm, "Invalid variable name \"" + splitInstr[0] + "\". Must start with A-z and can only contain A-z, 0-9 and _ characters.");
+			}
+		}
+		else {
+			throw exception(lnm, "Cannot define variable with same name as a keyword!");
+		}
+	}
+
 	let expression = splitInstr[1].trim();
 
 	// yes these are case sensitive cope
@@ -371,11 +457,13 @@ function decode(lnm, instruction, globals) {
 					{"type": "LABEL", "line": lnm, "label": ifToElse.label} // the if statement's jump for if false, aka this is where to start else execution
 				];
 			}
-			else throw exception(lnm, "ELSE does not take any operands!");
+			else {
+				throw exception(lnm, "ELSE does not take any operands!");
+			}
 		case "END":
 			switch (expression) {
 				case "":
-					return {"type": "TERMINATE", "line": lnm};
+					return [{"type": "TERMINATE", "line": lnm}];
 				case "IF":
 					// cannot end if if there's no if
 					if (globals.ifstack.length == 0) {
@@ -396,7 +484,7 @@ function decode(lnm, instruction, globals) {
 
 // main code
 
-const testProcedure = fs.readFileSync('procedure.bsc', 'utf8', function (err,data) {
+const testProcedure = fs.readFileSync(process.argv[2], 'utf8', function (err,data) {
 	if (err) {
 		console.log("Error loading lecturers.json");
 		console.log(err);
@@ -404,9 +492,13 @@ const testProcedure = fs.readFileSync('procedure.bsc', 'utf8', function (err,dat
 	}
 }).split(/\r?\n/); // stolen regex
 
-try {
-	run(testProcedure);
-}
-catch(e) {
-	console.error(e);
-}
+
+// hack to not get horrible "exception in promise" errors
+async function asdfasdf() {
+	try {
+		await run(testProcedure);
+	}
+	catch(e) {
+		console.error(e);
+	}
+}; asdfasdf();

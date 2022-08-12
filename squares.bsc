@@ -1,0 +1,11 @@
+i = 1
+
+THE TOP:
+PRINT i * i
+i = i + 1
+
+IF i = 11
+  END
+END IF
+
+GOTO THE TOP
