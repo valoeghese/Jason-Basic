@@ -5,19 +5,6 @@ const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END"];
 // https://stackoverflow.com/questions/18193953/waiting-for-user-to-enter-input-in-node-js
 const readline = require('readline');
 
-function queryStdin(query) {
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-    });
-
-    return new Promise(resolve => rl.question(query, ans => {
-        rl.close();
-        resolve(ans);
-    }))
-}
-
-
 // This is the easiest way to do it I swear
 // Source: https://stackoverflow.com/questions/2878703/split-string-once-in-javascript
 // This always returns a size-2 array of strings
@@ -29,7 +16,7 @@ String.prototype.splitOnce = function(on) {
 
 // i comment my code very well thank you
 
-async function run(procedure) {
+async function run(procedure, io) {
 	let variables = {};
 	let instructions = [];
 	let labels = {};
@@ -39,7 +26,7 @@ async function run(procedure) {
 	let i = 0;
 	let decode_Globals = {}; // for keeping track of state line-to-line for this procedure purely from decode
 
-	console.log("Parsing...");
+	io.debug("Parsing...");
 
 	function vars2str(vars) {
 		result = "";
@@ -65,14 +52,14 @@ async function run(procedure) {
 			line = line.substring(0, line.length - 1); // remove the * at the end for main decoding
 		}
 
- 		let decoded = decode(i + 1, line, decode_Globals); // decode into list of instructions
+ 		let decoded = decode(i + 1, line, decode_Globals, io); // decode into list of instructions
 		instructions.push.apply(instructions, decoded); // append
 
 		i++; // increment index
 	}
 
 	i = 0; // rewind for labling
-	console.log("Indexing Labels...");
+	io.debug("Indexing Labels...");
 
 	// assign labels
 	// done separately for cleanliness
@@ -103,13 +90,13 @@ async function run(procedure) {
 				// labels are handled prior to execution
 				break;
 			case "PRINT":
-				console.log(instruction.expression(variables));
+				io.out(instruction.expression(variables));
 				break;
 			case "INPUT_DISCARD":
-				await queryStdin(instruction.expression(variables));
+				await io.in(instruction.expression(variables));
 				break;
 			case "INPUT":
-				variables[instruction.var] = await queryStdin(instruction.expression(variables));
+				variables[instruction.var] = await io.in(instruction.expression(variables));
 				break;
 			case "JUMP":
 				jmpIndex = labels[instruction.label];
@@ -146,7 +133,7 @@ async function run(procedure) {
 				process.exit();
 				break;
 			default:
-				console.error("Could not handle instruction type \"" + instruction.type + "\"...");
+				io.error("Could not handle instruction type \"" + instruction.type + "\"...");
 				break;
 		}
 		
@@ -301,7 +288,7 @@ function tokenise(lnm, expression) {
 // what are you talking about, unsafely using eval? who could ever
 // returns the expression to evaluate as a javascript function, transformed from the input
 // dont do this
-function compileExpression(lnm, tokens) {
+function compileExpression(lnm, tokens, io) {
 	let jsExpression = "vars => ";
 
 	for (let i = 0; i < tokens.length; i++) {
@@ -335,21 +322,21 @@ function compileExpression(lnm, tokens) {
 		return eval(jsExpression);
 	}
 	catch (e) {
-		console.error("Translator Error on line " + lnm);
-		console.error(">> CONTEXT: Translating DJ/BASIC tokens " + JSON.stringify(tokens) + " to JavaScript Expression as " + jsExpression);
-		console.error("Caused By: ");
+		io.error("Translator Error on line " + lnm);
+		io.error(">> CONTEXT: Translating DJ/BASIC tokens " + JSON.stringify(tokens) + " to JavaScript Expression as " + jsExpression);
+		io.error("Caused By: ");
 		throw e;
 	}
 }
 
 // combo
-function translateExpression(lnm, expression) {
-	return compileExpression(lnm, tokenise(lnm, expression));
+function translateExpression(lnm, expression, io) {
+	return compileExpression(lnm, tokenise(lnm, expression), io);
 }
 
 // a common operation
-function simpleExpression(lnm, keyword, expression) {
-	return {"type": keyword, "line": lnm, "expression": translateExpression(lnm, expression)};
+function simpleExpression(lnm, keyword, expression, io) {
+	return {"type": keyword, "line": lnm, "expression": translateExpression(lnm, expression, io)};
 }
 
 // Parameters
@@ -358,7 +345,7 @@ function simpleExpression(lnm, keyword, expression) {
 // - globals (READ/WRITE) = a map shared across the compilation of a procedure, to keep track of state
 // Returns
 // - the parsed executable instruction
-function decode(lnm, instruction, globals) {
+function decode(lnm, instruction, globals, io) {
 	// initialise globals if first time
 	if (globals.blockstack == undefined) globals.blockstack = []; // if stack
 	if (globals.ifid == undefined) globals.ifid = 0; // free if id tracker, for sections
@@ -397,7 +384,7 @@ function decode(lnm, instruction, globals) {
 		
 		if (KEYWORDS.indexOf(splitInstr[0]) == -1) {
 			if (IDENTIFIER_REGEX.test(splitInstr[0])) {
-				return [{"type": "VAR", "line": lnm, "var": splitInstr[0], "expression": translateExpression(lnm, expression)}];
+				return [{"type": "VAR", "line": lnm, "var": splitInstr[0], "expression": translateExpression(lnm, expression, io)}];
 			}
 			else {
 				throw exception(lnm, "Invalid variable name \"" + splitInstr[0] + "\". Must start with A-z and can only contain A-z, 0-9 and _ characters.");
@@ -418,7 +405,7 @@ function decode(lnm, instruction, globals) {
 			return []; // comment 2 electric boogaloo
 		case "PRINT":
 			if (expression == '') throw exception(lnm, "PRINT requires an operand but none given!");
-			return [simpleExpression(lnm, "PRINT", expression)];
+			return [simpleExpression(lnm, "PRINT", expression, io)];
 		case "INPUT":
 			if (expression == '') throw exception(lnm, "INPUT requires an operand but none given!");
 			let tokens = tokenise(lnm, expression);
@@ -433,11 +420,11 @@ function decode(lnm, instruction, globals) {
 				}
 			}
 
-			if (toIndex == -1) return [{"type": "INPUT_DISCARD", "line": lnm, "expression": compileExpression(lnm, tokens)}];
+			if (toIndex == -1) return [{"type": "INPUT_DISCARD", "line": lnm, "expression": compileExpression(lnm, tokens, io)}];
 
 			let spliced = tokens.splice(0, toIndex);
 			//console.log(spliced);
-			let compiledExpression = compileExpression(lnm, spliced); // splice the expression to compile out
+			let compiledExpression = compileExpression(lnm, spliced, io); // splice the expression to compile out
 
 			// remainder should be "TO" + variable
 			if (tokens.length != 2) {
@@ -455,7 +442,7 @@ function decode(lnm, instruction, globals) {
 		case "IF":
 			if (expression == '') throw exception(lnm, "IF requires an operand but none given!");
 
-			ifJmp = simpleExpression(lnm, "JUMP_IFN", expression);
+			ifJmp = simpleExpression(lnm, "JUMP_IFN", expression, io);
 			ifJmp.block = "IF";
 			ifJmp.label = "@IF" + (globals.ifid++); // set to current and increment to next free one. @ for synthetic sections as it's an invalid label character
 
@@ -464,7 +451,7 @@ function decode(lnm, instruction, globals) {
 		case "WHILE":
 			if (expression == '') throw exception(lnm, "WHILE requires an operand but none given!");
 
-			whileJmp = simpleExpression(lnm, "JUMP_IFN", expression);
+			whileJmp = simpleExpression(lnm, "JUMP_IFN", expression, io);
 			whileJmp.block = "WHILE";
 			whileJmp.whileid = globals.whileid++; // next one
 			whileJmp.label = "@WHILE_END" + whileJmp.whileid; // jump to here if false
@@ -531,6 +518,7 @@ function decode(lnm, instruction, globals) {
 }
 
 // main code
+// File Intepreter Mode
 
 const testProcedure = fs.readFileSync(process.argv[2], 'utf8', function (err,data) {
 	if (err) {
@@ -540,11 +528,27 @@ const testProcedure = fs.readFileSync(process.argv[2], 'utf8', function (err,dat
 	}
 }).split(/\r?\n/); // stolen regex
 
+const fileInterpreterIO = {
+	"out": console.log,
+	"debug": console.log,
+	"error": console.error,
+	"in": (query) => {
+		const rl = readline.createInterface({
+			input: process.stdin,
+			output: process.stdout,
+		});
+	
+		return new Promise(resolve => rl.question(query, ans => {
+			rl.close();
+			resolve(ans);
+		}))
+	} 
+};
 
 // hack to not get horrible "exception in promise" errors
 async function asdfasdf() {
 	try {
-		await run(testProcedure);
+		await run(testProcedure, fileInterpreterIO);
 	}
 	catch(e) {
 		console.error(e);
