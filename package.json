@@ -10,5 +10,10 @@
     "interpreter"
   ],
   "author": "Mekal Covic",
-  "license": "SEE LICENSE IN LICENSE"
+  "license": "SEE LICENSE IN LICENSE",
+  "dependencies": {
+    "discord.js": "^14.2.0",
+    "dotenv": "^16.0.1",
+    "node-fetch": "^2.6.7"
+  }
 }

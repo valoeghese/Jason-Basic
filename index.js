@@ -1,9 +1,18 @@
 fs = require('fs');
-const LABEL_REGEX = /[A-z0-9 ]+/;
-const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END"];
+const { Client, GatewayIntentBits, Partials, MessageEmbed } = require('discord.js');
 
 // https://stackoverflow.com/questions/18193953/waiting-for-user-to-enter-input-in-node-js
 const readline = require('readline');
+const fetch = require('node-fetch');
+require("dotenv").config();
+
+const LABEL_REGEX = /[A-z0-9 ]+/;
+const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END"];
+
+// https://amiradata.com/javascript-sleep-function/
+const sleep = (milliseconds) => {
+	return new Promise(resolve => setTimeout(resolve, milliseconds))
+}
 
 // This is the easiest way to do it I swear
 // Source: https://stackoverflow.com/questions/2878703/split-string-once-in-javascript
@@ -26,7 +35,7 @@ async function run(procedure, io) {
 	let i = 0;
 	let decode_Globals = {}; // for keeping track of state line-to-line for this procedure purely from decode
 
-	io.debug("Parsing...");
+	await io.debug("Parsing...");
 
 	function vars2str(vars) {
 		result = "";
@@ -52,14 +61,14 @@ async function run(procedure, io) {
 			line = line.substring(0, line.length - 1); // remove the * at the end for main decoding
 		}
 
- 		let decoded = decode(i + 1, line, decode_Globals, io); // decode into list of instructions
+ 		let decoded = await decode(i + 1, line, decode_Globals, io); // decode into list of instructions
 		instructions.push.apply(instructions, decoded); // append
 
 		i++; // increment index
 	}
 
 	i = 0; // rewind for labling
-	io.debug("Indexing Labels...");
+	await io.debug("Indexing Labels...");
 
 	// assign labels
 	// done separately for cleanliness
@@ -90,7 +99,7 @@ async function run(procedure, io) {
 				// labels are handled prior to execution
 				break;
 			case "PRINT":
-				io.out(instruction.expression(variables));
+				await io.out(instruction.expression(variables));
 				break;
 			case "INPUT_DISCARD":
 				await io.in(instruction.expression(variables));
@@ -130,10 +139,9 @@ async function run(procedure, io) {
 				variables[instruction.var] = instruction.expression(variables);
 				break;
 			case "TERMINATE":
-				process.exit();
-				break;
+				return;
 			default:
-				io.error("Could not handle instruction type \"" + instruction.type + "\"...");
+				await io.error("Could not handle instruction type \"" + instruction.type + "\"...");
 				break;
 		}
 		
@@ -288,7 +296,7 @@ function tokenise(lnm, expression) {
 // what are you talking about, unsafely using eval? who could ever
 // returns the expression to evaluate as a javascript function, transformed from the input
 // dont do this
-function compileExpression(lnm, tokens, io) {
+async function compileExpression(lnm, tokens, io) {
 	let jsExpression = "vars => ";
 
 	for (let i = 0; i < tokens.length; i++) {
@@ -322,21 +330,21 @@ function compileExpression(lnm, tokens, io) {
 		return eval(jsExpression);
 	}
 	catch (e) {
-		io.error("Translator Error on line " + lnm);
-		io.error(">> CONTEXT: Translating DJ/BASIC tokens " + JSON.stringify(tokens) + " to JavaScript Expression as " + jsExpression);
-		io.error("Caused By: ");
+		await io.error("Translator Error on line " + lnm);
+		await io.error(">> CONTEXT: Translating DJ/BASIC tokens " + JSON.stringify(tokens) + " to JavaScript Expression as " + jsExpression);
+		await io.error("Caused By: ");
 		throw e;
 	}
 }
 
 // combo
-function translateExpression(lnm, expression, io) {
-	return compileExpression(lnm, tokenise(lnm, expression), io);
+async function translateExpression(lnm, expression, io) {
+	return await compileExpression(lnm, tokenise(lnm, expression), io);
 }
 
 // a common operation
-function simpleExpression(lnm, keyword, expression, io) {
-	return {"type": keyword, "line": lnm, "expression": translateExpression(lnm, expression, io)};
+async function simpleExpression(lnm, keyword, expression, io) {
+	return {"type": keyword, "line": lnm, "expression": await translateExpression(lnm, expression, io)};
 }
 
 // Parameters
@@ -345,7 +353,7 @@ function simpleExpression(lnm, keyword, expression, io) {
 // - globals (READ/WRITE) = a map shared across the compilation of a procedure, to keep track of state
 // Returns
 // - the parsed executable instruction
-function decode(lnm, instruction, globals, io) {
+async function decode(lnm, instruction, globals, io) {
 	// initialise globals if first time
 	if (globals.blockstack == undefined) globals.blockstack = []; // if stack
 	if (globals.ifid == undefined) globals.ifid = 0; // free if id tracker, for sections
@@ -380,11 +388,11 @@ function decode(lnm, instruction, globals, io) {
 
 	if (splitInstr[1][0] == "=") {
 		// treat as assignment
-		let expression = splitInstr[1].substring(1).trim();
-		
+		let expression = splitInstr[1].substring(1).trim(); // remove the = and trim again for the expression
+
 		if (KEYWORDS.indexOf(splitInstr[0]) == -1) {
 			if (IDENTIFIER_REGEX.test(splitInstr[0])) {
-				return [{"type": "VAR", "line": lnm, "var": splitInstr[0], "expression": translateExpression(lnm, expression, io)}];
+				return [{"type": "VAR", "line": lnm, "var": splitInstr[0], "expression": await translateExpression(lnm, expression, io)}];
 			}
 			else {
 				throw exception(lnm, "Invalid variable name \"" + splitInstr[0] + "\". Must start with A-z and can only contain A-z, 0-9 and _ characters.");
@@ -405,7 +413,7 @@ function decode(lnm, instruction, globals, io) {
 			return []; // comment 2 electric boogaloo
 		case "PRINT":
 			if (expression == '') throw exception(lnm, "PRINT requires an operand but none given!");
-			return [simpleExpression(lnm, "PRINT", expression, io)];
+			return [await simpleExpression(lnm, "PRINT", expression, io)];
 		case "INPUT":
 			if (expression == '') throw exception(lnm, "INPUT requires an operand but none given!");
 			let tokens = tokenise(lnm, expression);
@@ -420,11 +428,11 @@ function decode(lnm, instruction, globals, io) {
 				}
 			}
 
-			if (toIndex == -1) return [{"type": "INPUT_DISCARD", "line": lnm, "expression": compileExpression(lnm, tokens, io)}];
+			if (toIndex == -1) return [{"type": "INPUT_DISCARD", "line": lnm, "expression": await compileExpression(lnm, tokens, io)}];
 
 			let spliced = tokens.splice(0, toIndex);
 			//console.log(spliced);
-			let compiledExpression = compileExpression(lnm, spliced, io); // splice the expression to compile out
+			let compiledExpression = await compileExpression(lnm, spliced, io); // splice the expression to compile out
 
 			// remainder should be "TO" + variable
 			if (tokens.length != 2) {
@@ -442,7 +450,7 @@ function decode(lnm, instruction, globals, io) {
 		case "IF":
 			if (expression == '') throw exception(lnm, "IF requires an operand but none given!");
 
-			ifJmp = simpleExpression(lnm, "JUMP_IFN", expression, io);
+			ifJmp = await simpleExpression(lnm, "JUMP_IFN", expression, io);
 			ifJmp.block = "IF";
 			ifJmp.label = "@IF" + (globals.ifid++); // set to current and increment to next free one. @ for synthetic sections as it's an invalid label character
 
@@ -451,7 +459,7 @@ function decode(lnm, instruction, globals, io) {
 		case "WHILE":
 			if (expression == '') throw exception(lnm, "WHILE requires an operand but none given!");
 
-			whileJmp = simpleExpression(lnm, "JUMP_IFN", expression, io);
+			whileJmp = await simpleExpression(lnm, "JUMP_IFN", expression, io);
 			whileJmp.block = "WHILE";
 			whileJmp.whileid = globals.whileid++; // next one
 			whileJmp.label = "@WHILE_END" + whileJmp.whileid; // jump to here if false
@@ -518,39 +526,136 @@ function decode(lnm, instruction, globals, io) {
 }
 
 // main code
+
+//====================================================================================================
 // File Intepreter Mode
 
-const testProcedure = fs.readFileSync(process.argv[2], 'utf8', function (err,data) {
-	if (err) {
-		console.log("Error loading lecturers.json");
-		console.log(err);
-		process.exit();
-	}
-}).split(/\r?\n/); // stolen regex
+// const testProcedure = fs.readFileSync(process.argv[2], 'utf8', function (err,data) {
+// 	if (err) {
+// 		console.log("Error loading lecturers.json");
+// 		console.log(err);
+// 		process.exit();
+// 	}
+// }).split(/\r?\n/); // stolen regex
 
-const fileInterpreterIO = {
-	"out": console.log,
-	"debug": console.log,
-	"error": console.error,
-	"in": (query) => {
-		const rl = readline.createInterface({
-			input: process.stdin,
-			output: process.stdout,
-		});
+// const fileInterpreterIO = {
+// 	"out": console.log,
+// 	"debug": console.log,
+// 	"error": console.error,
+// 	"in": (query) => {
+// 		const rl = readline.createInterface({
+// 			input: process.stdin,
+// 			output: process.stdout,
+// 		});
 	
-		return new Promise(resolve => rl.question(query, ans => {
-			rl.close();
-			resolve(ans);
-		}))
-	} 
-};
+// 		return new Promise(resolve => rl.question(query, ans => {
+// 			rl.close();
+// 			resolve(ans);
+// 		}))
+// 	} 
+// };
 
-// hack to not get horrible "exception in promise" errors
-async function asdfasdf() {
-	try {
-		await run(testProcedure, fileInterpreterIO);
+// // hack to not get horrible "exception in promise" errors
+// async function asdfasdf() {
+// 	try {
+// 		await run(testProcedure, fileInterpreterIO);
+// 	}
+// 	catch(e) {
+// 		fileInterpreterIO.error(e);
+// 	}
+// }; asdfasdf();
+//====================================================================================================
+
+
+//====================================================================================================
+// Discord Bot Mode
+// Largely copied from the main daddy jason bot
+const client = new Client({
+	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+	partials: [Partials.Channel, Partials.Message]
+});
+
+client.on('ready', () => {
+	console.log(`Logged in as ${client.user.tag}! Using Prefix: ${process.env.prefix}`);
+});
+
+// Map of thread channels to latest message
+var scriptLatestMessage = {};
+
+client.on("messageCreate", async (message) => {
+	if (!message.author.bot) {
+		const content = message.content.toUpperCase().replace('’', '\'');
+
+		if (content.toUpperCase() == process.env.prefix + "/BASIC") {
+				if (!message.channel.isThread()) {
+				const file = message.attachments.first()?.url;
+				if (!file) return; // no file
+
+				let fileParts = file.split("/");
+
+				const thread = await message.startThread({
+					"name": fileParts[fileParts.length - 1],
+					"autoArchiveDuration": 60,
+					type: "GUILD_PUBLIC_THREAD",
+					reason: "script evaluation"
+				});
+
+				const response = await fetch(file);
+
+				if (response.ok) {
+					// initialise this to null, a value which means nothing but !== undefined.
+					scriptLatestMessage[thread] = null;
+
+					// create context
+					const scriptContextIO = {
+						"out": async (msg) => await thread.send(msg.toString()),
+						"debug": async (msg) => await thread.send(msg.toString()),
+						"error": async (msg) => await thread.send(msg.toString()),
+						"in": async (query) => {
+							await thread.send(query);
+
+							let readMsg = NaN; // using NaN as a magic constant to mean "seeking response"
+							scriptLatestMessage[thread] = readMsg;
+
+							while (!readMsg) {
+								//console.log("seeking...");
+								readMsg = scriptLatestMessage[thread];
+								await sleep(100);
+							}
+
+							let result = scriptLatestMessage[thread];
+							scriptLatestMessage[thread] = null; // whereas null just means "the session is in progress"
+							return result;
+						}
+					};
+
+					// run the script in the thread
+					try {
+						const script = await response.text();
+						//console.log(script);
+						await run(script.split(/\r?\n/), scriptContextIO);
+						delete scriptLatestMessage[thread]; // remove this session
+					} catch (e) {
+						console.log(e);
+						scriptContextIO.error(e);
+						delete scriptLatestMessage[thread]; // remove this session also in errors
+					}
+				}
+				else {
+					await thread.send("Failed to read file. Aborting...");
+					thread.setArchived(true);
+				}
+			}
+		}
+		else if (content.toUpperCase() == process.env.prefix + "/SHUTDOWN BASIC") {
+			await message.reply("sdfgsdfgsfdgsdfgsdfgsd");
+			client.destroy();
+		}
+		else if (scriptLatestMessage[message.channel] === NaN) {
+			scriptLatestMessage[message.channel] = content;
+		}
 	}
-	catch(e) {
-		console.error(e);
-	}
-}; asdfasdf();
+});
+
+client.login(process.env.token);
+//====================================================================================================
