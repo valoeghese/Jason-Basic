@@ -56,6 +56,7 @@ async function run(procedure) {
 	}
 
 	while (i < procedure.length) {
+		//console.log(i + 1, " ", procedure[i]);
 		let line = procedure[i].trim();
 
 		// handle breakpoints first. done by placing * at the end of a line. breaks BEFORE the line.
@@ -168,43 +169,6 @@ const BRACKETS_OPERATORS_REGEX = /[\(\)\+\-\*\/\!\&\|\=\>\<\%]/;
 const SPACE_BRACKETS_OPERATORS_REGEX = /[\t \(\)\+\-\*\/\!\&\|\=\>\<\%]/;
 const NUMBERS_REGEX = /[0-9]/;
 
-// expression translator to js
-// what are you talking about, unsafely using eval? who could ever
-// returns the expression to evaluate as a javascript function, transformed from the input
-// dont do this
-function compileExpression(lnm, tokens) {
-	let jsExpression = "vars => ";
-
-	for (let i = 0; i < tokens.length; i++) {
-		let token = tokens[i];
-
-		// keywords that are allowed inline must be handled before expression translation
-		if (token.type == "KEYWORD") {
-			throw exception(lnm, "Unexpected keyword \"" + token.value + '"');
-		}
-		else if (token.type == "OPERATOR") {
-			if (/[\&\|\=]/.test(token.value)) {
-				jsExpression += token.value + token.value;
-			} else {
-				jsExpression += token.value;
-			}
-		}
-		else if (token.type == "STRING") {
-			jsExpression += '"' + token.value + '"';
-		}
-		else if (token.type == "VAR") {
-			jsExpression += "vars[\"" + token.value + "\"]";
-		}
-		else if (token.type == "NUMBER") {
-			jsExpression += token.value;
-		}
-
-		jsExpression += " ";
-	}
-
-	return eval(jsExpression);
-}
-
 // tokeniser
 // yes this is needed to prevent spaghetti
 function tokenise(lnm, expression) {
@@ -251,12 +215,14 @@ function tokenise(lnm, expression) {
 					stringAccumulator += c;
 				}
 			}
-			else if (SPACE_BRACKETS_OPERATORS_REGEX) {
+			else if (SPACE_BRACKETS_OPERATORS_REGEX.test(c)) {
 				// number ends
 				tokens.push({"type": "NUMBER", "value": stringAccumulator});
 				// reset number info to prepare for future use
 				stringAccumulator = "";
 				numberMode = 0;
+				// rewind so it can be read again out of number mode
+				i--;
 			}
 			else {
 				throw exception(lnm, "Unexpected character while parsing number: \"" + c + '"');
@@ -282,6 +248,13 @@ function tokenise(lnm, expression) {
 				varIndex = i;
 			}
 			else if (BRACKETS_OPERATORS_REGEX.test(c)) {
+				if (i != expression.length - 1 && (c == '>' || c == '<')) { // "defer judgement"... if it's > or < it should not be at the end but idc ur problem (not a problem for tokeniser)
+					if (expression[i + 1] == '=') {
+						i++; // skip 2 characters, not one, bc this is a 2 character token
+						c += '='; // and add the equals to the tokenz
+					}
+				}
+
 				tokens.push({"type": "OPERATOR", "value": c});
 			}
 			else if (c == '"') {
@@ -324,6 +297,51 @@ function tokenise(lnm, expression) {
 	return tokens;
 }
 
+// expression translator to js
+// what are you talking about, unsafely using eval? who could ever
+// returns the expression to evaluate as a javascript function, transformed from the input
+// dont do this
+function compileExpression(lnm, tokens) {
+	let jsExpression = "vars => ";
+
+	for (let i = 0; i < tokens.length; i++) {
+		let token = tokens[i];
+
+		// keywords that are allowed inline must be handled before expression translation
+		if (token.type == "KEYWORD") {
+			throw exception(lnm, "Unexpected keyword \"" + token.value + '"');
+		}
+		else if (token.type == "OPERATOR") {
+			if (token.value.length == 1 && /[\&\|\=]/.test(token.value)) {
+				jsExpression += token.value + token.value;
+			} else {
+				jsExpression += token.value;
+			}
+		}
+		else if (token.type == "STRING") {
+			jsExpression += '"' + token.value + '"';
+		}
+		else if (token.type == "VAR") {
+			jsExpression += "vars[\"" + token.value + "\"]";
+		}
+		else if (token.type == "NUMBER") {
+			jsExpression += token.value;
+		}
+
+		jsExpression += " ";
+	}
+
+	try{
+		return eval(jsExpression);
+	}
+	catch (e) {
+		console.error("Translator Error on line " + lnm);
+		console.error(">> CONTEXT: Translating DJ/BASIC tokens " + JSON.stringify(tokens) + " to JavaScript Expression as " + jsExpression);
+		console.error("Caused By: ");
+		throw e;
+	}
+}
+
 // combo
 function translateExpression(lnm, expression) {
 	return compileExpression(lnm, tokenise(lnm, expression));
@@ -331,8 +349,9 @@ function translateExpression(lnm, expression) {
 
 // a common operation
 function simpleExpression(lnm, keyword, expression) {
-	return [{"type": keyword, "line": lnm, "expression": translateExpression(lnm, expression)}];
+	return {"type": keyword, "line": lnm, "expression": translateExpression(lnm, expression)};
 }
+
 // Parameters
 // - lnm = line number (0-indexed)
 // - instruction = the instruction on that line
@@ -341,9 +360,10 @@ function simpleExpression(lnm, keyword, expression) {
 // - the parsed executable instruction
 function decode(lnm, instruction, globals) {
 	// initialise globals if first time
-	if (globals.ifstack == undefined) globals.ifstack = []; // if stack
+	if (globals.blockstack == undefined) globals.blockstack = []; // if stack
 	if (globals.ifid == undefined) globals.ifid = 0; // free if id tracker, for sections
-
+	if (globals.whileid == undefined) globals.whileid = 0; // free while id tracker, for sections
+	
 	// empty lines and comments are No-Op
 	// comments can be done with #, %, or //
 	// or with the REM keyword which is also reserved.
@@ -398,7 +418,7 @@ function decode(lnm, instruction, globals) {
 			return []; // comment 2 electric boogaloo
 		case "PRINT":
 			if (expression == '') throw exception(lnm, "PRINT requires an operand but none given!");
-			return simpleExpression(lnm, "PRINT", expression);
+			return [simpleExpression(lnm, "PRINT", expression)];
 		case "INPUT":
 			if (expression == '') throw exception(lnm, "INPUT requires an operand but none given!");
 			let tokens = tokenise(lnm, expression);
@@ -434,23 +454,36 @@ function decode(lnm, instruction, globals) {
 			return [{"type": "JUMP", "line": lnm, "label": expression}];
 		case "IF":
 			if (expression == '') throw exception(lnm, "IF requires an operand but none given!");
+
 			ifJmp = simpleExpression(lnm, "JUMP_IFN", expression);
-			
-			ifJmp[0].label = "@IF" + (globals.ifid++); // set to current and increment to next free one. @ for synthetic sections as it's an invalid label character
-			globals.ifstack.push(ifJmp[0]); // push this onto the if stack
-			return ifJmp;
+			ifJmp.block = "IF";
+			ifJmp.label = "@IF" + (globals.ifid++); // set to current and increment to next free one. @ for synthetic sections as it's an invalid label character
+
+			globals.blockstack.push(ifJmp); // push this onto the block stack
+			return [ifJmp];
+		case "WHILE":
+			if (expression == '') throw exception(lnm, "WHILE requires an operand but none given!");
+
+			whileJmp = simpleExpression(lnm, "JUMP_IFN", expression);
+			whileJmp.block = "WHILE";
+			whileJmp.whileid = globals.whileid++; // next one
+			whileJmp.label = "@WHILE_END" + whileJmp.whileid; // jump to here if false
+
+			globals.blockstack.push(whileJmp); // push this onto the block stack
+			return [{"type": "LABEL", "line": lnm, "label": "@WHILE_START" + whileJmp.whileid}, whileJmp];
 		case "ELSE":
 			if (expression == '') {
-				if (globals.ifstack.length == 0) {
+				if (globals.blockstack.length == 0) {
 					throw exception(lnm, "ELSE with no matching IF!");
 				}
 
 				// switchemeroo
 				// pop the if statement and set its label target to here, and place this one on the if stack here as a JUMP
 				// make sure to put the JUMP before the else label as if jumps before it reaches else label
-				let ifToElse = globals.ifstack.pop();
+				let ifToElse = globals.blockstack.pop();
 				let elseJmp = {"type": "JUMP", "line": lnm, "label": "ELSE" + ifToElse.label}; // see comment above and/or comments on return for more detail
-				globals.ifstack.push(elseJmp); // push else as an imposter onto the if stack (sus)
+				elseJmp.block = "IF"; // yessir this is indeed an if
+				globals.blockstack.push(elseJmp); // push else as an imposter onto the if stack (sus)
 
 				return [
 					elseJmp, // eg if the if is @IF1, the matching else is ELSE@IF1. This jumps away from else execution
@@ -466,14 +499,29 @@ function decode(lnm, instruction, globals) {
 					return [{"type": "TERMINATE", "line": lnm}];
 				case "IF":
 					// cannot end if if there's no if
-					if (globals.ifstack.length == 0) {
+					if (globals.blockstack.length == 0) {
 						throw exception(lnm, "Ending if when there's no matching IF to end!");
 					}
 
-					let ifToEnd = globals.ifstack.pop();
-					// create label to jump to for 'else'. If the if has an else block we've done earlier the hack of replacing the item on the if stack with an else jump after setting the real if to the else. Little switchermeroo.
+					let ifToEnd = globals.blockstack.pop();
+					if (ifToEnd.block != "IF") throw exception(lnm, "Current block being ended is not an IF block!");
 
+					// create label to jump to for 'else'. If the if has an else block we've done earlier the hack of replacing the item on the if stack with an else jump after setting the real if to the else. Little switchermeroo.
 					return [{"type": "LABEL", "line": lnm, "label": ifToEnd.label}]; // the jump target for an if ending with an else, or an if with no else
+				case "WHILE":
+					// cannot end if if there's no if
+					if (globals.blockstack.length == 0) {
+						throw exception(lnm, "Ending while when there's no matching WHILE to end!");
+					}
+
+					let whileToEnd = globals.blockstack.pop();
+					if (whileToEnd.block != "WHILE") throw exception(lnm, "Current block being ended is not a WHILE block!");
+					
+					// create the GOTO to loop to the top, and a label to jump to for when the condition is false
+					return [
+						{"type": "JUMP", "line": lnm, "label": "@WHILE_START" + whileToEnd.whileid},
+						{"type": "LABEL", "line": lnm, "label": whileToEnd.label}
+					];
 				default:
 					throw exception(lnm, "Unknown block construction \"" + expression + '"');
 			}

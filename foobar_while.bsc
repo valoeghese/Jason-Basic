@@ -1,0 +1,20 @@
+i = 1
+INPUT "How many iterations should we do? " TO end_at
+
+WHILE i <= end_at
+  IF i % 3 = 0
+    IF i % 5 = 0
+      PRINT "FooBar"
+    ELSE
+      PRINT "Foo"
+    END IF
+  ELSE
+    IF i % 5 = 0
+      PRINT "Bar"
+    ELSE
+      PRINT i
+    END IF
+  END IF
+
+  i = i + 1
+END WHILE
