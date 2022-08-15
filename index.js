@@ -145,7 +145,7 @@ async function run(procedure, io) {
 				break;
 		}
 		
-		i++;
+		await io.onLineEnd(i++);
 	}
 
 	//console.log(variables);
@@ -552,7 +552,8 @@ async function decode(lnm, instruction, globals, io) {
 // 			rl.close();
 // 			resolve(ans);
 // 		}))
-// 	} 
+// 	},
+// 	"onLineEnd": async lnm => {}
 // };
 
 // // hack to not get horrible "exception in promise" errors
@@ -581,13 +582,23 @@ client.on('ready', () => {
 
 // Map of thread channels to latest message
 var scriptLatestMessage = {};
+// Map of thread channels to force exits
+var scriptForceExits = {};
+// Map of users to thread channels
+var userScriptsRunning = {};
 
 client.on("messageCreate", async (message) => {
 	if (!message.author.bot) {
 		const content = message.content.toUpperCase().replace('’', '\'');
 
 		if (content.toUpperCase() == process.env.prefix + "/BASIC") {
-				if (!message.channel.isThread()) {
+			// check if they already have a script running
+			if (userScriptsRunning[message.author.id]) {
+				message.reply("You already have a DJ/BASIC script running in thread #" + userScriptsRunning[message.author.id].name + ". Use dj/terminate in that thread to force-stop it!");
+				return;
+			}
+
+			if (!message.channel.isThread()) {
 				const file = message.attachments.first()?.url;
 				if (!file) return; // no file
 
@@ -605,10 +616,16 @@ client.on("messageCreate", async (message) => {
 				if (response.ok) {
 					// initialise this to null, a value which means nothing but !== undefined.
 					scriptLatestMessage[thread] = null;
+					scriptForceExits[thread] = null;
+					const owner = message.author.id;
+					userScriptsRunning[owner] = thread;
 
 					// create context
 					const scriptContextIO = {
-						"out": async (msg) => await thread.send(msg.toString()),
+						"out": async (msg) => {
+							await sleep(500);
+							await thread.send(msg.toString());
+						},
 						"debug": async (msg) => await thread.send(msg.toString()),
 						"error": async (msg) => await thread.send(msg.toString()),
 						"in": async (query) => {
@@ -626,6 +643,12 @@ client.on("messageCreate", async (message) => {
 							let result = scriptLatestMessage[thread];
 							scriptLatestMessage[thread] = null; // whereas null just means "the session is in progress"
 							return result;
+						},
+						"onLineEnd": async lnm => {
+							// check for force-terminations
+							if (scriptForceExits[thread]) {
+								throw scriptForceExits[thread];
+							}
 						}
 					};
 
@@ -634,12 +657,20 @@ client.on("messageCreate", async (message) => {
 						const script = await response.text();
 						//console.log(script);
 						await run(script.split(/\r?\n/), scriptContextIO);
-						delete scriptLatestMessage[thread]; // remove this session
 					} catch (e) {
 						console.log(e);
 						scriptContextIO.error(e);
-						delete scriptLatestMessage[thread]; // remove this session also in errors
 					}
+
+					// remove this session regardless
+					delete scriptLatestMessage[thread];
+					delete scriptForceExits[thread];
+					delete userScriptsRunning[owner];
+
+					await thread.send("Archiving thread in 10s ...");
+					await sleep(1000 * 10);
+					// try archive thread
+					thread.setArchived(true);
 				}
 				else {
 					await thread.send("Failed to read file. Aborting...");
@@ -647,12 +678,19 @@ client.on("messageCreate", async (message) => {
 				}
 			}
 		}
-		else if (content.toUpperCase() == process.env.prefix + "/SHUTDOWN BASIC") {
+		else if (content == process.env.prefix + "/SHUTDOWNBASIC" && message.author.id == "521522396856057876") {
 			await message.reply("sdfgsdfgsfdgsdfgsdfgsd");
 			client.destroy();
 		}
+		else if (message.channel.isThread() && content == process.env.prefix + "/TERMINATE") {
+			let thread = message.channel;
+
+			if (scriptForceExits[thread] !== undefined && (message.author.id == "521522396856057876" || message.channel == userScriptsRunning[message.author.id])) { // null !=== undefined. Also check if they own the thread or are me
+				scriptForceExits[thread] = "Force exit by " + message.author.tag;
+			}
+		}
 		else if (scriptLatestMessage[message.channel] === NaN) {
-			scriptLatestMessage[message.channel] = content;
+			scriptLatestMessage[message.channel] = message.content.replace('’', '\'');
 		}
 	}
 });

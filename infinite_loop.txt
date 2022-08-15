@@ -1,0 +1,3 @@
+Start:
+PRINT "I am an infinite loop :woozy_face:"
+GOTO Start
