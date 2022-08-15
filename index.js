@@ -553,7 +553,7 @@ async function decode(lnm, instruction, globals, io) {
 // 			resolve(ans);
 // 		}))
 // 	},
-// 	"onLineEnd": async lnm => {}
+// 	"onLineEnd": async (lnm) => {}
 // };
 
 // // hack to not get horrible "exception in promise" errors
@@ -631,7 +631,7 @@ client.on("messageCreate", async (message) => {
 						"in": async (query) => {
 							await thread.send(query);
 
-							let readMsg = NaN; // using NaN as a magic constant to mean "seeking response"
+							let readMsg = 0; // using number 0 as a magic constant to mean "seeking response"
 							scriptLatestMessage[thread] = readMsg;
 
 							while (!readMsg) {
@@ -644,7 +644,7 @@ client.on("messageCreate", async (message) => {
 							scriptLatestMessage[thread] = null; // whereas null just means "the session is in progress"
 							return result;
 						},
-						"onLineEnd": async lnm => {
+						"onLineEnd": async (lnm) => {
 							// check for force-terminations
 							if (scriptForceExits[thread]) {
 								throw scriptForceExits[thread];
@@ -680,7 +680,11 @@ client.on("messageCreate", async (message) => {
 		}
 		else if (content == process.env.prefix + "/SHUTDOWNBASIC" && message.author.id == "521522396856057876") {
 			await message.reply("sdfgsdfgsfdgsdfgsdfgsd");
-			client.destroy();
+			await client.destroy();
+			process.exit();
+		}
+		else if (content == process.env.prefix + "/LOGSTATE" && message.author.id == "521522396856057876") {
+			console.log(scriptLatestMessage, scriptForceExits, userScriptsRunning, message.channel.toString(), scriptLatestMessage[message.channel], scriptLatestMessage[message.channel] === NaN);
 		}
 		else if (message.channel.isThread() && content == process.env.prefix + "/TERMINATE") {
 			let thread = message.channel;
@@ -689,7 +693,7 @@ client.on("messageCreate", async (message) => {
 				scriptForceExits[thread] = "Force exit by " + message.author.tag;
 			}
 		}
-		else if (scriptLatestMessage[message.channel] === NaN) {
+		else if (scriptLatestMessage[message.channel] === 0) {
 			scriptLatestMessage[message.channel] = message.content.replace('’', '\'');
 		}
 	}
