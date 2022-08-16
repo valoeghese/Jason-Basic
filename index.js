@@ -581,70 +581,88 @@ client.on('ready', () => {
 });
 
 async function djMsg(message) {
+	let script = "";
+	let input = [];
+
+	// try read a file
 	const file = message.attachments.first()?.url;
-	if (!file) return; // no file
 
-	const response = await fetch(file);
+	if (file) {
+		const response = await fetch(file);
 
-	if (response.ok) {
-		let resultMsg = "";
-		let startTimeMillis = +new Date();
-		
-		// input stuff
-		let input = message.content.split('\n');
-		input.splice(0, 1); // ignore initial command
-		let inputIndex = 0;
-
-		// create context
-		const messageContextIO = {
-			"out": async (msg) => {
-				resultMsg += msg + "\n";
-			},
-			"debug": async (msg) => {},
-			"error": async (msg) => await message.reply(msg.toString()),
-			"in": async (query) => {
-				resultMsg += query + "\n";
-				
-				// get next prompt in input
-				let next = input[inputIndex++];
-
-				// default value of blank string
-				if (!next) next = "";
-
-				return next;
-			},
-			"onLineEnd": async (lnm) => {
-				// check for force-terminations
-				if (resultMsg.length > 500) {
-					throw "Output message is too long :( (Max 500 characters for dj/msg)";
-				}
-				else {
-					let now = +new Date();
-
-					if ((now - startTimeMillis) > 15 * 1000) {
-						throw "Script took too long to execute! (Max 15 seconds for dj/msg)"
-					}
-				}
-			}
-		};
-
-		// run the script to create a message
-		try {
-			const script = await response.text();
-			//console.log(script);
-			await run(script.split(/\r?\n/), messageContextIO);
+		if (response.ok) {
+			script = await response.text();
+			script = script.split(/\r?\n/);
 			
-			// if we get here it should be successful
-			// send the message
-			message.reply(resultMsg);
-		} catch (e) {
-			console.log(e);
-			messageContextIO.error(e);
+			// read inputs
+			input = message.content.split('\n');
+			input.splice(0, 1); // ignore initial command
+		}
+		else {
+			await message.reply("Failed to read file.");
 		}
 	}
 	else {
-		await message.reply("Failed to read file.");
+		// script anstatt input
+		script = message.content.split('\n');
+		script.splice(0, 1); // ignore initial command
 	}
+
+	// only try run code if there *is* code.
+	if (script == "") return;
+
+	let resultMsg = "";
+	let startTimeMillis = +new Date();
+	
+	// currently being read index
+	let inputIndex = 0;
+
+	// create context
+	const messageContextIO = {
+		"out": async (msg) => {
+			resultMsg += msg.toString() + "\n";
+		},
+		"debug": async (msg) => {},
+		"error": async (msg) => {
+			resultMsg += msg.toString() + "\n";
+		},
+		"in": async (query) => {
+			resultMsg += query + "\n";
+			
+			// get next prompt in input
+			let next = input[inputIndex++];
+
+			// default value of blank string
+			if (!next) next = "";
+
+			return next;
+		},
+		"onLineEnd": async (lnm) => {
+			// check for force-terminations
+			if (resultMsg.length > 500) {
+				throw "Output message is too long :( (Max 500 characters for dj/msg)";
+			}
+			else {
+				let now = +new Date();
+
+				if ((now - startTimeMillis) > 15 * 1000) {
+					throw "Script took too long to execute! (Max 15 seconds for dj/msg)"
+				}
+			}
+		}
+	};
+
+	// run the script to create a message
+	try {
+		//console.log(script);
+		await run(script, messageContextIO);
+	} catch (e) {
+		console.log(e);
+		messageContextIO.error(e);
+	}
+
+	// send the message and/or errors
+	message.reply(resultMsg);
 }
 
 // Map of thread channels to latest message

@@ -1,0 +1,2 @@
+INPUT "" TO person
+PRINT "<:jason_hauntest:958216884111691806> Hello, " + person
