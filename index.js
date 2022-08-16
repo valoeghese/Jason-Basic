@@ -525,20 +525,20 @@ async function decode(lnm, instruction, globals, io) {
 						{"type": "LABEL", "line": lnm, "label": whileToEnd.label}
 					];
 				default:
-					// handle potential variable assign with trash spaces
-					let eqLocation = instruction.indexOf('=');
-
-					if (eqLocation != -1) {
-						trueSplit = instruction.splitOnce('=');
-
-						if (IDENTIFIER_REGEX.test(trueSplit[0].trim())) {
-							return await assignVariable(lnm, trueSplit[0].trim(), trueSplit[1].trim(), io);
-						}
-					}
-
 					throw exception(lnm, "Unknown block construction \"" + expression + '"');
 			}
 		default: // catch-all
+			// handle potential variable assign with trash spaces
+			let eqLocation = instruction.indexOf('=');
+
+			if (eqLocation != -1) {
+				trueSplit = instruction.splitOnce('=');
+
+				if (IDENTIFIER_REGEX.test(trueSplit[0].trim())) {
+					return await assignVariable(lnm, trueSplit[0].trim(), trueSplit[1].trim(), io);
+				}
+			}
+
 			throw exception(lnm, "Unable to parse line \"" + instruction + "\" (with assumed instruction of \"" + splitInstr[0] + "\")... is this correct syntax for DJ BASIC?");
 	}
 }
@@ -598,6 +598,10 @@ const client = new Client({
 client.on('ready', () => {
 	console.log(`Logged in as ${client.user.tag}! Using Prefix: ${process.env.prefix}`);
 });
+
+function removeNonBlank(msg) {
+	return msg.trim() == "" ? "_ _" : msg; // hax
+}
 
 async function djMsg(message) {
 	let script = "";
@@ -681,8 +685,7 @@ async function djMsg(message) {
 	}
 
 	// send the message and/or errors
-	if (resultMsg == "") resultMsg = "_ _"; // hax
-	message.reply(resultMsg);
+	message.reply(removeNonBlank(resultMsg));
 }
 
 // Map of thread channels to latest message
@@ -729,12 +732,12 @@ client.on("messageCreate", async (message) => {
 					const scriptContextIO = {
 						"out": async (msg) => {
 							await sleep(500);
-							await thread.send(msg.toString());
+							await thread.send(removeNonBlank(msg.toString()));
 						},
-						"debug": async (msg) => await thread.send(msg.toString()),
-						"error": async (msg) => await thread.send(msg.toString()),
+						"debug": async (msg) => await thread.send(removeNonBlank(msg.toString())),
+						"error": async (msg) => await thread.send(removeNonBlank(msg.toString())),
 						"in": async (query) => {
-							await thread.send(query);
+							await thread.send(removeNonBlank(query));
 
 							let readMsg = 0; // using number 0 as a magic constant to mean "seeking response"
 							scriptLatestMessage[thread] = readMsg;
