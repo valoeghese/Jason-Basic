@@ -4,6 +4,7 @@ const { Client, GatewayIntentBits, Partials, MessageEmbed } = require('discord.j
 // https://stackoverflow.com/questions/18193953/waiting-for-user-to-enter-input-in-node-js
 const readline = require('readline');
 const fetch = require('node-fetch');
+const { parse } = require('path');
 require("dotenv").config();
 
 const LABEL_REGEX = /[A-z0-9 ]+/;
@@ -327,6 +328,7 @@ async function compileExpression(lnm, tokens, io) {
 	}
 
 	try{
+		//console.log(jsExpression);
 		return eval(jsExpression);
 	}
 	catch (e) {
@@ -345,6 +347,20 @@ async function translateExpression(lnm, expression, io) {
 // a common operation
 async function simpleExpression(lnm, keyword, expression, io) {
 	return {"type": keyword, "line": lnm, "expression": await translateExpression(lnm, expression, io)};
+}
+
+async function assignVariable(lnm, varName, expression, io) {
+	if (KEYWORDS.indexOf(varName) == -1) {
+		if (IDENTIFIER_REGEX.test(varName)) {
+			return [{"type": "VAR", "line": lnm, "var": varName, "expression": await translateExpression(lnm, expression, io)}];
+		}
+		else {
+			throw exception(lnm, "Invalid variable name \"" + varName + "\". Must start with A-z and can only contain A-z, 0-9 and _ characters.");
+		}
+	}
+	else {
+		throw exception(lnm, "Cannot define variable with same name as a keyword!");
+	}
 }
 
 // Parameters
@@ -386,21 +402,12 @@ async function decode(lnm, instruction, globals, io) {
 
 	let splitInstr = instruction.splitOnce(" ");
 
+	// space then eq
 	if (splitInstr[1][0] == "=") {
 		// treat as assignment
 		let expression = splitInstr[1].substring(1).trim(); // remove the = and trim again for the expression
 
-		if (KEYWORDS.indexOf(splitInstr[0]) == -1) {
-			if (IDENTIFIER_REGEX.test(splitInstr[0])) {
-				return [{"type": "VAR", "line": lnm, "var": splitInstr[0], "expression": await translateExpression(lnm, expression, io)}];
-			}
-			else {
-				throw exception(lnm, "Invalid variable name \"" + splitInstr[0] + "\". Must start with A-z and can only contain A-z, 0-9 and _ characters.");
-			}
-		}
-		else {
-			throw exception(lnm, "Cannot define variable with same name as a keyword!");
-		}
+		return await assignVariable(lnm, splitInstr[0], expression, io);
 	}
 
 	let expression = splitInstr[1].trim();
@@ -518,6 +525,17 @@ async function decode(lnm, instruction, globals, io) {
 						{"type": "LABEL", "line": lnm, "label": whileToEnd.label}
 					];
 				default:
+					// handle potential variable assign with trash spaces
+					let eqLocation = instruction.indexOf('=');
+
+					if (eqLocation != -1) {
+						trueSplit = instruction.splitOnce('=');
+
+						if (IDENTIFIER_REGEX.test(trueSplit[0].trim())) {
+							return await assignVariable(lnm, trueSplit[0].trim(), trueSplit[1].trim(), io);
+						}
+					}
+
 					throw exception(lnm, "Unknown block construction \"" + expression + '"');
 			}
 		default: // catch-all
@@ -570,7 +588,8 @@ async function decode(lnm, instruction, globals, io) {
 
 //====================================================================================================
 // Discord Bot Mode
-// Largely copied from the main daddy jason bot
+// Parts copied from the main daddy jason bot
+
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 	partials: [Partials.Channel, Partials.Message]
@@ -658,10 +677,11 @@ async function djMsg(message) {
 		await run(script, messageContextIO);
 	} catch (e) {
 		console.log(e);
-		messageContextIO.error(e);
+		await messageContextIO.error(e);
 	}
 
 	// send the message and/or errors
+	if (resultMsg == "") resultMsg = "_ _"; // hax
 	message.reply(resultMsg);
 }
 
@@ -789,3 +809,24 @@ client.on("messageCreate", async (message) => {
 
 client.login(process.env.token);
 //====================================================================================================
+
+
+// ultra test code
+// const asdf = `i = 1 
+// IF i >= 1 
+// i = i + 1
+// END IF`.split('\n');
+// let globals = {};
+// const nothingIO = {
+// 	"out": async (msg) => {},
+// 	"debug": async (msg) => {},
+// 	"error": async (msg) => {},
+// 	"in": async (query) => {return "";},
+// 	"onLineEnd": async (lnm) => {}
+// };
+
+// async function asdfg() {
+// 	for (let l of asdf) {
+// 		console.log(await decode(0, l, globals, nothingIO));
+// 	}
+// }; asdfg();
