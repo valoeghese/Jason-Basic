@@ -27,6 +27,7 @@ String.prototype.splitOnce = function(on) {
 // i comment my code very well thank you
 
 async function run(procedure, io) {
+	//console.log("I am a dwarf");
 	let variables = {};
 	let instructions = [];
 	let labels = {};
@@ -67,6 +68,8 @@ async function run(procedure, io) {
 
 		i++; // increment index
 	}
+
+	//console.log(instructions);
 
 	i = 0; // rewind for labling
 	await io.debug("Indexing Labels...");
@@ -603,7 +606,7 @@ function removeNonBlank(msg) {
 	return msg.trim() == "" ? "_ _" : msg; // hax
 }
 
-async function djMsg(message) {
+async function djMsg(message, content) {
 	let script = "";
 	let input = [];
 
@@ -618,7 +621,7 @@ async function djMsg(message) {
 			script = script.split(/\r?\n/);
 			
 			// read inputs
-			input = message.content.split('\n');
+			input = content.split('\n');
 			input.splice(0, 1); // ignore initial command
 		}
 		else {
@@ -627,7 +630,7 @@ async function djMsg(message) {
 	}
 	else {
 		// script anstatt input
-		script = message.content.split('\n');
+		script = content.split('\n');
 		script.splice(0, 1); // ignore initial command
 	}
 
@@ -697,7 +700,9 @@ var userScriptsRunning = {};
 
 client.on("messageCreate", async (message) => {
 	if (!message.author.bot) {
-		const content = message.content.toUpperCase().replace('’', '\'');
+		const contentCased = message.content.replace('’', '\'').replace('”', '"').replace('“', '"');
+		const content = contentCased.toUpperCase();
+		//console.log(content, content.split('\n')[0], process.env.prefix + "/MSG");
 
 		if (content == process.env.prefix + "/BASIC") {
 			// check if they already have a script running
@@ -786,8 +791,8 @@ client.on("messageCreate", async (message) => {
 				}
 			}
 		}
-		if (content.split('\n')[0] == process.env.prefix + "/MSG") {
-			await djMsg(message);
+		else if (content.split('\n')[0].trim() == process.env.prefix + "/MSG") {
+			await djMsg(message, contentCased);
 		}
 		else if (content == process.env.prefix + "/SHUTBASICDOWN" && message.author.id == "521522396856057876") {
 			await message.reply("sdfgsdfgsfdgsdfgsdfgsd");
