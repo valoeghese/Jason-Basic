@@ -580,6 +580,73 @@ client.on('ready', () => {
 	console.log(`Logged in as ${client.user.tag}! Using Prefix: ${process.env.prefix}`);
 });
 
+async function djMsg(message) {
+	const file = message.attachments.first()?.url;
+	if (!file) return; // no file
+
+	const response = await fetch(file);
+
+	if (response.ok) {
+		let resultMsg = "";
+		let startTimeMillis = +new Date();
+		
+		// input stuff
+		let input = message.content.split('\n');
+		input.splice(0, 1); // ignore initial command
+		let inputIndex = 0;
+
+		// create context
+		const messageContextIO = {
+			"out": async (msg) => {
+				resultMsg += msg + "\n";
+			},
+			"debug": async (msg) => {},
+			"error": async (msg) => await message.reply(msg.toString()),
+			"in": async (query) => {
+				resultMsg += query + "\n";
+				
+				// get next prompt in input
+				let next = input[inputIndex++];
+
+				// default value of blank string
+				if (!next) next = "";
+
+				return next;
+			},
+			"onLineEnd": async (lnm) => {
+				// check for force-terminations
+				if (resultMsg.length > 500) {
+					throw "Output message is too long :( (Max 500 characters for dj/msg)";
+				}
+				else {
+					let now = +new Date();
+
+					if ((now - startTimeMillis) > 15 * 1000) {
+						throw "Script took too long to execute! (Max 15 seconds for dj/msg)"
+					}
+				}
+			}
+		};
+
+		// run the script to create a message
+		try {
+			const script = await response.text();
+			//console.log(script);
+			await run(script.split(/\r?\n/), messageContextIO);
+			
+			// if we get here it should be successful
+			// send the message
+			message.reply(resultMsg);
+		} catch (e) {
+			console.log(e);
+			messageContextIO.error(e);
+		}
+	}
+	else {
+		await message.reply("Failed to read file.");
+	}
+}
+
 // Map of thread channels to latest message
 var scriptLatestMessage = {};
 // Map of thread channels to force exits
@@ -591,7 +658,7 @@ client.on("messageCreate", async (message) => {
 	if (!message.author.bot) {
 		const content = message.content.toUpperCase().replace('’', '\'');
 
-		if (content.toUpperCase() == process.env.prefix + "/BASIC") {
+		if (content == process.env.prefix + "/BASIC") {
 			// check if they already have a script running
 			if (userScriptsRunning[message.author.id]) {
 				message.reply("You already have a DJ/BASIC script running in thread #" + userScriptsRunning[message.author.id].name + ". Use dj/terminate in that thread to force-stop it!");
@@ -678,7 +745,10 @@ client.on("messageCreate", async (message) => {
 				}
 			}
 		}
-		else if (content == process.env.prefix + "/SHUTDOWNBASIC" && message.author.id == "521522396856057876") {
+		if (content.split('\n')[0] == process.env.prefix + "/MSG") {
+			await djMsg(message);
+		}
+		else if (content == process.env.prefix + "/SHUTBASICDOWN" && message.author.id == "521522396856057876") {
 			await message.reply("sdfgsdfgsfdgsdfgsdfgsd");
 			await client.destroy();
 			process.exit();
