@@ -8,7 +8,7 @@ const { parse } = require('path');
 require("dotenv").config();
 
 const LABEL_REGEX = /[A-z0-9 ]+/;
-const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END"];
+const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND"];
 
 // https://amiradata.com/javascript-sleep-function/
 const sleep = (milliseconds) => {
@@ -424,6 +424,20 @@ async function decode(lnm, instruction, globals, io) {
 		case "PRINT":
 			if (expression == '') throw exception(lnm, "PRINT requires an operand but none given!");
 			return [await simpleExpression(lnm, "PRINT", expression, io)];
+		case "RANDOM":
+			if (IDENTIFIER_REGEX.test(expression) && KEYWORDS.indexOf(expression) == -1) {
+				return {"type": "VAR", "line": lnm, "var": expression, "expression": vars => Math.random()};
+			}
+			else {
+				throw exception(lnm, "Invalid variable name to store RANDOM value in.")
+			}
+		case "ROUND":
+			if (IDENTIFIER_REGEX.test(expression) && KEYWORDS.indexOf(expression) == -1) {
+				return {"type": "VAR", "line": lnm, "var": expression, "expression": vars => Math.round(vars[expression])};
+			}
+			else {
+				throw exception(lnm, "Invalid variable name to perform ROUND operation on.")
+			}
 		case "INPUT":
 			if (expression == '') throw exception(lnm, "INPUT requires an operand but none given!");
 			let tokens = tokenise(lnm, expression);
