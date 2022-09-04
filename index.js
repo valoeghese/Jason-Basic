@@ -8,7 +8,7 @@ const { parse } = require('path');
 require("dotenv").config();
 
 const LABEL_REGEX = /[A-z0-9 ]+/;
-const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND"];
+const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND", "LOWERCASE", "UPPERCASE"];
 
 // https://amiradata.com/javascript-sleep-function/
 const sleep = (milliseconds) => {
@@ -103,6 +103,8 @@ async function run(procedure, io) {
 				// labels are handled prior to execution
 				break;
 			case "PRINT":
+				//console.log(instruction);
+				//console.log(variables);
 				await io.out(instruction.expression(variables));
 				break;
 			case "INPUT_DISCARD":
@@ -140,6 +142,7 @@ async function run(procedure, io) {
 				}
 				break;
 			case "VAR":
+				//console.log(instruction);
 				variables[instruction.var] = instruction.expression(variables);
 				break;
 			case "TERMINATE":
@@ -425,18 +428,42 @@ async function decode(lnm, instruction, globals, io) {
 			if (expression == '') throw exception(lnm, "PRINT requires an operand but none given!");
 			return [await simpleExpression(lnm, "PRINT", expression, io)];
 		case "RANDOM":
+			//console.log(expression);
+
+			if (expression == '') throw exception(lnm, "RANDOM requires a variable but none given!");
+			
 			if (IDENTIFIER_REGEX.test(expression) && KEYWORDS.indexOf(expression) == -1) {
-				return {"type": "VAR", "line": lnm, "var": expression, "expression": vars => Math.random()};
+				return [{"type": "VAR", "line": lnm, "var": expression, "expression": vars => Math.random()}];
 			}
 			else {
 				throw exception(lnm, "Invalid variable name to store RANDOM value in.")
 			}
 		case "ROUND":
+			if (expression == '') throw exception(lnm, "ROUND requires a variable but none given!");
+
 			if (IDENTIFIER_REGEX.test(expression) && KEYWORDS.indexOf(expression) == -1) {
-				return {"type": "VAR", "line": lnm, "var": expression, "expression": vars => Math.round(vars[expression])};
+				return [{"type": "VAR", "line": lnm, "var": expression, "expression": vars => Math.round(vars[expression])}];
 			}
 			else {
 				throw exception(lnm, "Invalid variable name to perform ROUND operation on.")
+			}
+		case "LOWERCASE":
+			if (expression == '') throw exception(lnm, "LOWERCASE requires a variable but none given!");
+
+			if (IDENTIFIER_REGEX.test(expression) && KEYWORDS.indexOf(expression) == -1) {
+				return [{"type": "VAR", "line": lnm, "var": expression, "expression": vars => vars[expression].toString().toLowerCase()}];
+			}
+			else {
+				throw exception(lnm, "Invalid variable name to perform LOWERCASE operation on.")
+			}
+		case "UPPERCASE":
+			if (expression == '') throw exception(lnm, "UPPERCASE requires a variable but none given!");
+
+			if (IDENTIFIER_REGEX.test(expression) && KEYWORDS.indexOf(expression) == -1) {
+				return [{"type": "VAR", "line": lnm, "var": expression, "expression": vars => vars[expression].toString().toUpperCase()}];
+			}
+			else {
+				throw exception(lnm, "Invalid variable name to perform UPPERCASE operation on.")
 			}
 		case "INPUT":
 			if (expression == '') throw exception(lnm, "INPUT requires an operand but none given!");

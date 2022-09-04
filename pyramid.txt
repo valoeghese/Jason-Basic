@@ -1,0 +1,29 @@
+row = 0
+
+PRINT "```"
+
+% Have 6 rows
+WHILE row < 6
+   i = 0
+   line = ""
+
+   % Add spaces inversely related to the row number (so more spaces on top rows)
+   WHILE i < 5 - row
+      line = line + " "
+      i = i + 1
+   END WHILE
+
+   i = 0
+
+   % Add 'X's the number of times as the row number + 1 more
+   WHILE i <= 2 * row
+      line = line + "X"
+      i = i + 1
+   END WHILE
+
+   % Print the current line and move to the next row
+   PRINT line
+   row = row + 1
+END WHILE
+
+PRINT "```"
