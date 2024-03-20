@@ -8,7 +8,7 @@ const { parse } = require('path');
 require("dotenv").config();
 
 const LABEL_REGEX = /[A-z0-9 ]+/;
-const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND", "LOWERCASE", "UPPERCASE"];
+const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND", "LOWERCASE", "UPPERCASE", "DIM"];
 
 // https://amiradata.com/javascript-sleep-function/
 const sleep = (milliseconds) => {
