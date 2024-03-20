@@ -706,8 +706,8 @@ async function djMsg(message, content) {
 		},
 		"onLineEnd": async (lnm) => {
 			// check for force-terminations
-			if (resultMsg.length > 500) {
-				throw "Output message is too long :( (Max 500 characters for dj/msg)";
+			if (resultMsg.length > 1024) {
+				throw "Output message is too long :( (Max 1024 characters for dj/msg)";
 			}
 			else {
 				let now = +new Date();
@@ -725,6 +725,12 @@ async function djMsg(message, content) {
 		await run(script, messageContextIO);
 	} catch (e) {
 		console.log(e);
+
+		// ensure it actually caps it at 1024
+		if (resultMsg.length > 1024) {
+			resultMsg = resultMsg.substring(0, Math.max(1, 1024 - e.toString().length));
+		}
+
 		await messageContextIO.error(e);
 	}
 
