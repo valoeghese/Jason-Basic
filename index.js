@@ -465,6 +465,40 @@ async function decode(lnm, instruction, globals, io) {
 			else {
 				throw exception(lnm, "Invalid variable name to perform UPPERCASE operation on.")
 			}
+		case "DIM":
+			let partition = expression.trim().split(" ", 2);
+			
+			let arrayVarName = partition[0];
+			let arrayVarSizeExpr = partition[1];
+			
+			if (!arrayVarName) throw exception(lnm, "DIM requires a variable but none given!");
+			if (!arrayVarSizeExpr) throw exception(lnm, "DIM requires a size expression but none given!");
+
+			if (IDENTIFIER_REGEX.test(arrayVarName) && KEYWORDS.indexOf(arrayVarName) == -1) {
+				let expressionCalculator = await translateExpression(lnm, expression, io);
+
+				return [{"type": "VAR", "line": lnm, "var": expression, "expression": vars => {
+					let size = expressionCalculator(vars);
+
+					if (size < 0) {
+						throw exception(lnm, `Invalid array size: ${size}`);
+					} else if (size > 100) {
+						throw exception(lnm, `Exceeds maximum array size (100): ${size}`);
+					}
+
+					let new_array = new Array(size);
+					new_array.fill(0); // default values of 0
+
+					Object.seal(new_array); // no more properties
+
+					return new_array;
+				}}];
+			}
+			else {
+				throw exception(lnm, "Invalid variable name to define an array for.")
+			}
+
+			break;
 		case "INPUT":
 			if (expression == '') throw exception(lnm, "INPUT requires an operand but none given!");
 			let tokens = tokenise(lnm, expression);
