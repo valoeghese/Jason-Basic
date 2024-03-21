@@ -300,7 +300,19 @@ function tokenise(lnm, expression) {
 
 const MAX_DEPTH = 42;
 
-// expression translator to js
+// Expression translator to js
+
+// these functions are called by the translated javascript expression in eval
+function accessArray(lnm, arrayName, array, index) {
+	console.log("Accessing array " + arrayName);
+	
+	if (index < array.length && index > 0) {
+		return array[index];
+	} else {
+		throw exception(lnm, `Attempt to access array index out of bounds: ${index} (array ${arrayName} of length: ${array.length})`);
+	}
+}
+
 // lnm: line number
 // tokens: an array of the tokens to parse. tokens should be popped from the beginning
 // io: access to io
@@ -338,13 +350,17 @@ function compileExpressionComponent(lnm, tokens, io, depth = 0) {
 			jsExpression += '"' + token.value + '"';
 		}
 		else if (token.type == "VAR") {
-			jsExpression += "vars[\"" + token.value + "\"]";
+			let varAccess = "vars[\"" + token.value + "\"]";
 
 			// check token after in case it's indexing array '('
 			if (tokens.length > 0 && tokens[0].type === "OPERATOR" && tokens[0].value === '(') {
 				tokens.shift(); // consume the bracket to enter this array indexing state
-				jsExpression += '[' + compileExpressionComponent(lnm, tokens, io, depth + 1) + ']';
+				
+				let indexExpression = compileExpressionComponent(lnm, tokens, io, depth + 1);
+				varAccess = `accessArray(${lnm}, "${token.value}", ${varAccess}, ${indexExpression})`;
 			}
+
+			jsExpression += varAccess;
 		}
 		else if (token.type == "NUMBER") {
 			jsExpression += token.value;
@@ -366,6 +382,7 @@ function compileExpressionComponent(lnm, tokens, io, depth = 0) {
 // what are you talking about, unsafely using eval? who could ever
 // returns the expression to evaluate as a javascript function, transformed from the input
 // dont do this
+// we must be careful to not let people break the sandbox
 async function compileExpression(lnm, tokens, io) {
 	let jsExpression = "vars => " + compileExpressionComponent(lnm, tokens, io);
 
