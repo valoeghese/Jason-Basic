@@ -166,7 +166,6 @@ const IDENTIFIER_START_REGEX = /[A-z]/;
 const IDENTIFIER_CHAR_REGEX = /[A-z0-9_]/;
 const IDENTIFIER_REGEX = /[A-z][A-z0-9_]*/;
 
-const SPACE_OPERATORS_REGEX = /[\t \+\-\*\/\!\&\|\=\>\<\%]/;
 const BRACKETS_OPERATORS_REGEX = /[\(\)\+\-\*\/\!\&\|\=\>\<\%]/;
 const SPACE_BRACKETS_OPERATORS_REGEX = /[\t \(\)\+\-\*\/\!\&\|\=\>\<\%]/;
 const NUMBERS_REGEX = /[0-9]/;
@@ -232,12 +231,7 @@ function tokenise(lnm, expression) {
 		}
 		else if (varIndex > -1) {
 			if (!IDENTIFIER_CHAR_REGEX.test(c)) {
-				// hack for indexing
-				if ("[" == c) {
-					// parse some operator somehow then ']'
-				}
-				// end hack for indexing
-				else if (SPACE_OPERATORS_REGEX.test(c)) {
+				if (SPACE_BRACKETS_OPERATORS_REGEX.test(c)) {
 					tokens.push({"type": "VAR", "value": expression.slice(varIndex, i)});
 					varIndex = -1;
 					i--; // take another look at the operator under a... different lens ;)
