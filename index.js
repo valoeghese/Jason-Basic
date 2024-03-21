@@ -298,15 +298,24 @@ function tokenise(lnm, expression) {
 	return tokens;
 }
 
-// expression translator to js
-// what are you talking about, unsafely using eval? who could ever
-// returns the expression to evaluate as a javascript function, transformed from the input
-// dont do this
-async function compileExpression(lnm, tokens, io) {
-	let jsExpression = "vars => ";
+const MAX_DEPTH = 42;
 
-	for (let i = 0; i < tokens.length; i++) {
-		let token = tokens[i];
+// expression translator to js
+// lnm: line number
+// tokens: an array of the tokens to parse. tokens should be popped from the beginning
+// io: access to io
+// depth: the depth of the expression (in brackets.)
+function compileExpressionComponent(lnm, tokens, io, depth = 0) {
+	// max depth
+	if (depth > MAX_DEPTH) {
+		throw exception(lnm, "Exceeded max bracket depth! (42)");
+	}
+
+	let jsExpression = "";
+
+	while (tokens.length > 0) {
+		// get first element of the array and remove it.
+		let token = tokens.shift();
 
 		// keywords that are allowed inline must be handled before expression translation
 		if (token.type == "KEYWORD") {
@@ -315,6 +324,12 @@ async function compileExpression(lnm, tokens, io) {
 		else if (token.type == "OPERATOR") {
 			if (token.value.length == 1 && /[\&\|\=]/.test(token.value)) {
 				jsExpression += token.value + token.value;
+			} else if (token.value === '(') {
+				// increase depth
+				jsExpression += '(' + compileExpressionComponent(lnm, tokens, io, depth + 1) + ')';
+			} else if (token.value === ')') {
+				// decrease depth
+				return jsExpression; // READERS NOTE EARLY RETURN HERE!!
 			} else {
 				jsExpression += token.value;
 			}
@@ -324,6 +339,11 @@ async function compileExpression(lnm, tokens, io) {
 		}
 		else if (token.type == "VAR") {
 			jsExpression += "vars[\"" + token.value + "\"]";
+
+			// check token after in case it's indexing array '('
+			if (tokens.length > 0 && tokens[0].type === "OPERATOR" && tokens[0].value === '(') {
+				jsExpression += '[' + compileExpressionComponent(lnm, tokens, io, depth + 1) + ']';
+			}
 		}
 		else if (token.type == "NUMBER") {
 			jsExpression += token.value;
@@ -331,6 +351,20 @@ async function compileExpression(lnm, tokens, io) {
 
 		jsExpression += " ";
 	}
+
+	// this should only be reached at depth 0. other depths should decrease depth at )
+	if (depth !== 0) {
+		throw exception(lnm, "Unmatched bracket on line! Expected ')'");
+	}
+
+	return jsExpression;
+}
+
+// what are you talking about, unsafely using eval? who could ever
+// returns the expression to evaluate as a javascript function, transformed from the input
+// dont do this
+async function compileExpression(lnm, tokens, io) {
+	let jsExpression = "vars => " + compileExpressionComponent(lnm, tokens, io);
 
 	try{
 		//console.log(jsExpression);
