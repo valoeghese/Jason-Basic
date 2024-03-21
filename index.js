@@ -302,7 +302,7 @@ const MAX_DEPTH = 42;
 
 // Expression translator to js
 
-// these functions are called by the translated javascript expression in eval
+// these functions are called by the translated javascript expression in the eval
 function accessArray(lnm, arrayName, array, index) {
 	console.log("Accessing array " + arrayName);
 	
