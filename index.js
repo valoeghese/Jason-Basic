@@ -342,6 +342,7 @@ function compileExpressionComponent(lnm, tokens, io, depth = 0) {
 
 			// check token after in case it's indexing array '('
 			if (tokens.length > 0 && tokens[0].type === "OPERATOR" && tokens[0].value === '(') {
+				tokens.shift(); // consume the bracket to enter this array indexing state
 				jsExpression += '[' + compileExpressionComponent(lnm, tokens, io, depth + 1) + ']';
 			}
 		}
@@ -354,7 +355,9 @@ function compileExpressionComponent(lnm, tokens, io, depth = 0) {
 
 	// this should only be reached at depth 0. other depths should decrease depth at )
 	if (depth !== 0) {
-		throw exception(lnm, "Unmatched bracket on line! Expected ')'");
+		//console.log(tokens);
+		//console.log(jsExpression);
+		throw exception(lnm, `Unmatched bracket on line! Expected ')' (Depth: ${depth})`);
 	}
 
 	return jsExpression;
@@ -508,9 +511,9 @@ async function decode(lnm, instruction, globals, io) {
 			if (!arrayVarSizeExpr) throw exception(lnm, "DIM requires a size expression but none given!");
 
 			if (IDENTIFIER_REGEX.test(arrayVarName) && KEYWORDS.indexOf(arrayVarName) == -1) {
-				let expressionCalculator = await translateExpression(lnm, expression, io);
+				let expressionCalculator = await translateExpression(lnm, arrayVarSizeExpr, io);
 
-				return [{"type": "VAR", "line": lnm, "var": expression, "expression": vars => {
+				return [{"type": "VAR", "line": lnm, "var": arrayVarName, "expression": vars => {
 					let size = expressionCalculator(vars);
 
 					if (size < 0) {
