@@ -134,7 +134,7 @@ async function decode(lnm, tokens, globals, io) {
 
                 if (label.type !== "VAR") throw exception(lnm, `Not a valid label identifier: ${label.value}`);
 
-                return [{"type": "JUMP", "line": lnm, "label": label}];
+                return [{"type": "JUMP", "line": lnm, "label": label.value}];
             case "IF":
                 if (tokens.length === 0) throw exception(lnm, "IF requires an operand but none given!");
 
