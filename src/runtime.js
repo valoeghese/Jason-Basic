@@ -46,7 +46,7 @@ async function run(procedure, io) {
 		// comments can be done with #, %, or //
 		// or with the REM keyword which is also reserved.
 		// Also inline comments are not supported
-		if (line.length == 0 || line[0] == '#' || line[0] == '%' || (line.length > 1 && line[0] == '/' && line[1] == '/')) {
+		if (line.length == 0 || line[0] == '#' || line[0] == '%' || (line.length > 1 && line[0] == '/' && line[1] == '/') || (line.startsWith("REM "))) {
 			// do nothing. this is a comment.
 		} else if (line[line.length - 1] == ':') {
             // handle labels first

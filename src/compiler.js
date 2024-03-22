@@ -1,7 +1,11 @@
 const MAX_DEPTH = 42;
-const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND", "LOWERCASE", "UPPERCASE", "DIM", "WHILE"];
+const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND", "LOWERCASE", "UPPERCASE", "DIM", "WHILE", "REM"];
 
 function exception(lineNum, msg) {
+	return "Syntax Error at line " + lineNum + ":\n>> " + msg;
+}
+
+function runtimeException(lineNum, msg) {
 	return "Exception at line " + lineNum + ":\n>> " + msg;
 }
 
@@ -39,8 +43,6 @@ async function decode(lnm, tokens, globals, io) {
     else if (head.type === "KEYWORD") {
         // Instructions are case sensitive
         switch (head.value) {
-            case "REM":
-                return []; // comment 2 electric boogaloo
             case "PRINT":
                 if (tokens.length === 0) throw exception(lnm, "PRINT requires an operand but none given!");
                 return [await simpleExpression(lnm, "PRINT", tokens, io)];
@@ -100,9 +102,9 @@ async function decode(lnm, tokens, globals, io) {
                     let size = expressionCalculator(vars);
 
                     if (size < 0) {
-                        throw exception(lnm, `Invalid array size: ${size}`);
+                        throw runtimeException(lnm, `Invalid array size: ${size}`);
                     } else if (size > 100) {
-                        throw exception(lnm, `Exceeds maximum array size (100): ${size}`);
+                        throw runtimeException(lnm, `Exceeds maximum array size (100): ${size}`);
                     }
 
                     let new_array = new Array(size);
@@ -262,7 +264,7 @@ function accessArray(lnm, arrayName, array, index) {
 	if (index < array.length && index > 0) {
 		return array[index];
 	} else {
-		throw exception(lnm, `Attempt to access array index out of bounds: ${index} (array ${arrayName} of length: ${array.length})`);
+		throw runtimeException(lnm, `Attempt to access array index out of bounds: ${index} (array ${arrayName} of length: ${array.length})`);
 	}
 }
 
@@ -273,7 +275,7 @@ function accessArray(lnm, arrayName, array, index) {
 function compileExpressionComponent(lnm, tokens, io, depth = 0) {
 	// max depth
 	if (depth > MAX_DEPTH) {
-		throw exception(lnm, "Exceeded max bracket depth! (42)");
+		throw runtimeException(lnm, "Exceeded max bracket depth! (42)");
 	}
 
 	let jsExpression = "";
