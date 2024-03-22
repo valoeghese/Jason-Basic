@@ -38,7 +38,7 @@ async function run(procedure, io) {
 
 		// handle breakpoints first. done by placing * at the end of a line. breaks BEFORE the line.
 		if (line[line.length - 1] == '*') {
-			instructions.push({"type": "INPUT_DISCARD", "line": i + 1, "expression": vars => "Breakpoint @ line " + (i + 1) + ", " + vars2str(vars)});
+			instructions.push({"type": "INPUT_DISCARD", "line": lnm, "expression": vars => "Breakpoint @ line " + (lnm) + ", " + vars2str(vars)});
 			line = line.substring(0, line.length - 1); // remove the * at the end for main decoding
 		}
 

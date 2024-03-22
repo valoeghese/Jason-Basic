@@ -1,5 +1,5 @@
 const MAX_DEPTH = 42;
-const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND", "LOWERCASE", "UPPERCASE", "DIM"];
+const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND", "LOWERCASE", "UPPERCASE", "DIM", "WHILE"];
 
 function exception(lineNum, msg) {
 	return "Exception at line " + lineNum + ":\n>> " + msg;
@@ -209,7 +209,7 @@ async function decode(lnm, tokens, globals, io) {
                 let target = tokens.shift(); // remove next token as the target of END
 
                 if (target.type !== "KEYWORD" || (target.value !== "IF" && target.value !== "WHILE")) {
-                    throw exception(lnm, `Unexpected token ${target.type} after END. Only IF and WHILE are allowed.`);
+                    throw exception(lnm, `Unexpected token ${target.value} of type ${target.type} after END. Only IF and WHILE are allowed.`);
                 }
 
                 if (tokens.length > 0) {
