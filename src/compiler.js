@@ -22,8 +22,8 @@ async function decode(lnm, tokens, globals, io) {
 	let head = tokens.shift(); // remove first token
     
     if (head.type === "KEYWORD") {
-        // Instructions should not be case sensitive
-        switch (head.value.toUpperCase()) {
+        // Instructions are case sensitive
+        switch (head.value) {
             case "REM":
                 return []; // comment 2 electric boogaloo
             case "PRINT":
