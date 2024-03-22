@@ -98,6 +98,9 @@ async function run(procedure, io) {
 		let instruction = instructions[i];
 
 		switch (instruction.type) {
+			case "ASSIGN_ELEMENT":
+				variables[instruction.var][instruction.index(variables)] = instruction.expression(variables);
+				break;
 			case "LABEL":
 				// labels are handled prior to execution
 				break;

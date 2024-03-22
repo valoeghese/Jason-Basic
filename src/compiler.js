@@ -37,8 +37,20 @@ async function decode(lnm, tokens, globals, io) {
             // Regular variable assignment
             return await assignVariable(lnm, head.value, tokens, io);
         } else if (operation.value === "(") {
-            // Assignment to array index
-              
+            // Element Assignment
+            let indexExpression = await compileExpression(lnm, tokens, io, 1);
+
+            // tokens should be at the closing bracket, next is =
+            if (tokens.length === 0) throw exception(lnm, "Expected '=' for element assignment.");
+            
+            operation = tokens.shift();
+
+            if (operation.type === "OPERATOR" && operation.value === '=') {
+                return [{"type": "ASSIGN_ELEMENT", "line": lnm, "var": head.value, "index": indexExpression, "expression": await compileExpression(lnm, tokens, io)}];
+            }
+            else {
+                throw exception(lnm, `Unexpected token '${operation.value}'.`);
+            }
         } else {
             throw exception(lnm, `Unexpected token '${operation.value}'.`);
         }
@@ -94,14 +106,14 @@ async function decode(lnm, tokens, globals, io) {
                 if (tokens.length < 2) throw exception(lnm, "DIM requires a variable name and a size expression.");
                 
                 // get variable name and ensure it is a variable name
-                let arrayVarName = tokens.shift(); // pop variable name off the tokens array
+                let arrayVarToken = tokens.shift(); // pop variable name off the tokens array
 
-                if (arrayVarName.type !== "VAR")
-                    throw exception(lnm, `Not a variable name: ${arrayVarName.value}`);
+                if (arrayVarToken.type !== "VAR")
+                    throw exception(lnm, `Not a variable name: ${arrayVarToken.value}`);
 
                 let expressionCalculator = await compileExpression(lnm, tokens, io);
 
-                return [{"type": "VAR", "line": lnm, "var": arrayVarName, "expression": vars => {
+                return [{"type": "VAR", "line": lnm, "var": arrayVarToken.value, "expression": vars => {
                     let size = expressionCalculator(vars);
 
                     if (size < 0) {
@@ -264,7 +276,7 @@ async function decode(lnm, tokens, globals, io) {
 function accessArray(lnm, arrayName, array, index) {
 	console.log("Accessing array " + arrayName);
 	
-	if (index < array.length && index > 0) {
+	if (index < array.length && index >= 0) {
 		return array[index];
 	} else {
 		throw runtimeException(lnm, `Attempt to access array index out of bounds: ${index} (array ${arrayName} of length: ${array.length})`);
@@ -346,8 +358,8 @@ function compileExpressionComponent(lnm, tokens, io, depth = 0) {
 // returns the expression to evaluate as a javascript function, transformed from the input
 // dont do this
 // we must be careful to not let people break the sandbox
-async function compileExpression(lnm, tokens, io) {
-	let jsExpression = "vars => " + compileExpressionComponent(lnm, tokens, io);
+async function compileExpression(lnm, tokens, io, depth = 0) {
+	let jsExpression = "vars => " + compileExpressionComponent(lnm, tokens, io, depth);
 
 	try{
 		//console.log(jsExpression);
