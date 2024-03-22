@@ -1,5 +1,7 @@
-const tokeniser = require("tokeniser.js");
-const compiler = require("compiler.js");
+const tokeniser = require("./tokeniser.js");
+const compiler = require("./compiler.js");
+
+const LABEL_REGEX = /[A-z0-9 ]+/;
 
 // i comment my code very well thank you
 
@@ -32,6 +34,7 @@ async function run(procedure, io) {
 	while (i < procedure.length) {
 		//console.log(i + 1, " ", procedure[i]);
 		let line = procedure[i].trim();
+        let lnm = i + 1; // the actual line number
 
 		// handle breakpoints first. done by placing * at the end of a line. breaks BEFORE the line.
 		if (line[line.length - 1] == '*') {
@@ -58,7 +61,7 @@ async function run(procedure, io) {
             }
 		} else {
             let tokens = await tokeniser.tokenise(lnm, line, compiler.KEYWORDS);
-			let decoded = await compiler.decode(i + 1, tokens, decode_Globals, io); // decode into list of instructions
+			let decoded = await compiler.decode(lnm, tokens, decode_Globals, io); // decode into list of instructions
 			instructions.push(...decoded); // append
         }
 

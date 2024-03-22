@@ -1,6 +1,4 @@
 const MAX_DEPTH = 42;
-
-const LABEL_REGEX = /[A-z0-9 ]+/;
 const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND", "LOWERCASE", "UPPERCASE", "DIM"];
 
 function exception(lineNum, msg) {
@@ -8,7 +6,7 @@ function exception(lineNum, msg) {
 }
 
 // Parameters
-// - lnm = the zero-indexed line number of this instruction
+// - lnm = the line number of this instruction
 // - tokens = the tokens to parse
 // - globals (READ/WRITE) = a map shared across the compilation of a procedure, to keep track of state
 // Returns

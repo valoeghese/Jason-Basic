@@ -7,7 +7,7 @@ const fetch = require('node-fetch');
 const { parse } = require('path');
 require("dotenv").config();
 
-const runtime = require("src/runtime.js");
+const runtime = require("./src/runtime.js");
 
 // https://amiradata.com/javascript-sleep-function/
 const sleep = (milliseconds) => {
