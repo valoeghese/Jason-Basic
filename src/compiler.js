@@ -36,6 +36,9 @@ async function decode(lnm, tokens, globals, io) {
         if (operation.value === "=") {
             // Regular variable assignment
             return await assignVariable(lnm, head.value, tokens, io);
+        } else if (operation.value === "(") {
+            // Assignment to array index
+              
         } else {
             throw exception(lnm, `Unexpected token '${operation.value}'.`);
         }
@@ -295,6 +298,11 @@ function compileExpressionComponent(lnm, tokens, io, depth = 0) {
 				// increase depth
 				jsExpression += '(' + compileExpressionComponent(lnm, tokens, io, depth + 1) + ')';
 			} else if (token.value === ')') {
+                // if at root depth, unmatched )!
+                if (depth === 0) {
+                    throw exception(lnm, "Unmatched closing bracket");
+                }
+
 				// decrease depth
 				return jsExpression; // READERS NOTE EARLY RETURN HERE!!
 			} else {
