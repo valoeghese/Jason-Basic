@@ -61,6 +61,10 @@ const sleep = (milliseconds) => {
 // Discord Bot Mode
 // Parts copied from the main daddy jason bot
 
+const ALLOWED_MENTIONS = {
+	"parse": ["users"]
+};
+
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 	partials: [Partials.Channel, Partials.Message]
@@ -162,7 +166,10 @@ async function djMsg(message, content) {
 	}
 
 	// send the message and/or errors
-	message.reply(removeNonBlank(resultMsg));
+	message.reply({
+		content: removeNonBlank(resultMsg),
+		allowedMentions: ALLOWED_MENTIONS
+	});
 }
 
 // Map of thread channels to latest message
@@ -210,12 +217,24 @@ client.on("messageCreate", async (message) => {
 					const scriptContextIO = {
 						"out": async (msg) => {
 							await sleep(500);
-							await thread.send(removeNonBlank(msg.toString()));
+							await thread.send({
+								content: removeNonBlank(msg.toString()),
+								allowedMentions: ALLOWED_MENTIONS
+							});
 						},
-						"debug": async (msg) => await thread.send(removeNonBlank(msg.toString())),
-						"error": async (msg) => await thread.send(removeNonBlank(msg.toString())),
+						"debug": async (msg) => await thread.send({
+							content: removeNonBlank(msg.toString()),
+							allowedMentions: ALLOWED_MENTIONS
+						}),
+						"error": async (msg) => await thread.send({
+							content: removeNonBlank(msg.toString()),
+							allowedMentions: ALLOWED_MENTIONS
+						}),
 						"in": async (query) => {
-							await thread.send(removeNonBlank(query));
+							await thread.send({
+								content: removeNonBlank(query),
+								allowedMentions: ALLOWED_MENTIONS
+							});
 
 							let readMsg = 0; // using number 0 as a magic constant to mean "seeking response"
 							scriptLatestMessage[thread] = readMsg;
