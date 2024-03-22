@@ -12,7 +12,7 @@
   "author": "Mekal Covic",
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
-    "discord.js": "^14.2.0",
+    "discord.js": "^14.14.1",
     "dotenv": "^16.0.1",
     "node-fetch": "^2.6.7"
   }
