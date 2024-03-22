@@ -19,7 +19,24 @@ async function decode(lnm, tokens, globals, io) {
 
 	let head = tokens.shift(); // remove first token
     
-    if (head.type === "KEYWORD") {
+    if (head.type === "VAR") {
+        if (tokens.length === 0) throw exception(lnm, `Unexpected token '${head.value}'. Did you mean to assign a variable?`);
+        
+        // variable assignment
+        let operation = tokens.shift();
+
+        if (operation.type !== "OPERATOR") {
+            throw exception(lnm, `Unexpected token '${operation.value}'.`);
+        }
+
+        if (operation.value === "=") {
+            // Regular variable assignment
+            return await assignVariable(lnm, head.value, tokens, io);
+        } else {
+            throw exception(lnm, `Unexpected token '${operation.value}'.`);
+        }
+    }
+    else if (head.type === "KEYWORD") {
         // Instructions are case sensitive
         switch (head.value) {
             case "REM":
@@ -334,24 +351,17 @@ async function compileExpression(lnm, tokens, io) {
 	}
 }
 
-// a common operation
+// common operations
+
 async function simpleExpression(lnm, keyword, tokens, io) {
 	return {"type": keyword, "line": lnm, "expression": await compileExpression(lnm, tokens, io)};
 }
 
 async function assignVariable(lnm, varName, tokens, io) {
-	if (KEYWORDS.indexOf(varName) == -1) {
-		if (IDENTIFIER_REGEX.test(varName)) {
-			return [{"type": "VAR", "line": lnm, "var": varName, "expression": await compileExpression(lnm, tokens, io)}];
-		}
-		else {
-			throw exception(lnm, "Invalid variable name \"" + varName + "\". Must start with A-z and can only contain A-z, 0-9 and _ characters.");
-		}
-	}
-	else {
-		throw exception(lnm, "Cannot define variable with same name as a keyword!");
-	}
+	return [{"type": "VAR", "line": lnm, "var": varName, "expression": await compileExpression(lnm, tokens, io)}];
 }
+
+// define module exports
 
 module.exports = {
     decode,
