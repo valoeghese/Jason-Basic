@@ -189,13 +189,12 @@ client.on("messageCreate", async (message) => {
 				const file = message.attachments.first()?.url;
 				if (!file) return; // no file
 
-				let fileParts = file.split("/");
+				let fileParts = file.split(/[\/\?]/);
 
 				const thread = await message.startThread({
-					"name": fileParts[fileParts.length - 1],
+					"name": fileParts[fileParts.length - 2],
 					"autoArchiveDuration": 60,
-					type: "GUILD_PUBLIC_THREAD",
-					reason: "script evaluation"
+					"reason": "script evaluation"
 				});
 
 				const response = await fetch(file);
