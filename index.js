@@ -78,7 +78,7 @@ function removeNonBlank(msg) {
 	return msg.trim() == "" ? "_ _" : msg; // hax
 }
 
-async function djMsg(message, content) {
+async function djMsg(message, content, send) {
 	let script = "";
 	let input = [];
 
@@ -166,7 +166,7 @@ async function djMsg(message, content) {
 	}
 
 	// send the message and/or errors
-	message.reply({
+	send({
 		content: removeNonBlank(resultMsg),
 		allowedMentions: ALLOWED_MENTIONS
 	});
@@ -284,7 +284,10 @@ client.on("messageCreate", async (message) => {
 			}
 		}
 		else if (content.split('\n')[0].trim() == process.env.prefix + "/MSG") {
-			await djMsg(message, contentCased);
+			await djMsg(message, contentCased, message.reply);
+		}
+		else if (content.split('\n')[0].trim() == process.env.prefix + "/MSG DETACH") {
+			await djMsg(message, contentCased, message.channel.send);
 		}
 		else if (content == process.env.prefix + "/SHUTBASICDOWN" && message.author.id == "521522396856057876") {
 			await message.reply("sdfgsdfgsfdgsdfgsdfgsd");
