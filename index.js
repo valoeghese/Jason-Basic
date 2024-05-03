@@ -78,7 +78,7 @@ function removeNonBlank(msg) {
 	return msg.trim() == "" ? "_ _" : msg; // hax
 }
 
-async function djMsg(message, content, send) {
+async function djMsg(message, content, send_response) {
 	let script = "";
 	let input = [];
 
@@ -166,7 +166,7 @@ async function djMsg(message, content, send) {
 	}
 
 	// send the message and/or errors
-	message.reply({
+	send_response({
 		content: removeNonBlank(resultMsg),
 		allowedMentions: ALLOWED_MENTIONS
 	});
