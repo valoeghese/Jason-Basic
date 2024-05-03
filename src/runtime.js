@@ -117,6 +117,7 @@ async function run(procedure, io) {
 				break;
 			case "JUMP":
 				jmpIndex = labels[instruction.label];
+				await yieldControl();
 
 				if (jmpIndex != undefined) {
 					i = jmpIndex - 1; // thought this was neater than continue;
@@ -131,6 +132,8 @@ async function run(procedure, io) {
 
 				// swap for 'jump if not'
 				if (instruction.type == "JUMP_IFN") b = !b;
+
+				await yieldControl();
 
 				if (b) { // check
 					jmpIndex = labels[instruction.label];
@@ -158,6 +161,11 @@ async function run(procedure, io) {
 	}
 
 	//console.log(variables);
+}
+
+// to prevent infinte loops in BASIC code from denial-of-servicing other subprocesses in the program.
+function yieldControl() {
+    return new Promise(resolve => setTimeout(resolve, 0));
 }
 
 function exception(lineNum, msg) {
