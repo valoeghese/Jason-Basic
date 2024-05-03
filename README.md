@@ -2,7 +2,7 @@
 
 High quality programming language to implement the most important programs in.
 
-There are some examples in the repository, but some of them were made before labels were not allowed to have spaces, so keep that in mind.
+There are some examples in the Examples folder you can check out.
 
 # Syntax
 

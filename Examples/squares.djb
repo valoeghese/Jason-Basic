@@ -1,6 +1,6 @@
 i = 1
 
-THE TOP:
+THE_TOP:
 PRINT i * i
 i = i + 1
 
@@ -8,4 +8,4 @@ IF i = 11
   END
 END IF
 
-GOTO THE TOP
+GOTO THE_TOP

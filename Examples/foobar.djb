@@ -1,7 +1,7 @@
 i = 1
 INPUT "How many iterations should we do? " TO end_at
 
-THE TOP:
+THE_TOP:
   IF i % 3 = 0
     IF i % 5 = 0
       PRINT "FooBar"
@@ -21,4 +21,4 @@ THE TOP:
   END IF
 
   i = i + 1
-GOTO THE TOP
+GOTO THE_TOP
