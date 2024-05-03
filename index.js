@@ -166,7 +166,7 @@ async function djMsg(message, content, send_response) {
 	}
 
 	// send the message and/or errors
-	send_response({
+	send_response(message, {
 		content: removeNonBlank(resultMsg),
 		allowedMentions: ALLOWED_MENTIONS
 	});
@@ -284,10 +284,10 @@ client.on("messageCreate", async (message) => {
 			}
 		}
 		else if (content.split('\n')[0].trim() == process.env.prefix + "/MSG") {
-			await djMsg(message, contentCased, message.reply);
+			await djMsg(message, contentCased, (msg, body) => msg.reply(body));
 		}
 		else if (content.split('\n')[0].trim() == process.env.prefix + "/MSG DETACH") {
-			await djMsg(message, contentCased, message.channel.send);
+			await djMsg(message, contentCased, (msg, body) => msg.channel.send(body));
 		}
 		else if (content == process.env.prefix + "/SHUTBASICDOWN" && message.author.id == "521522396856057876") {
 			await message.reply("sdfgsdfgsfdgsdfgsdfgsd");
