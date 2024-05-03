@@ -1,6 +1,6 @@
-const IDENTIFIER_START_REGEX = /[A-z]/;
-const IDENTIFIER_CHAR_REGEX = /[A-z0-9_]/;
-const IDENTIFIER_REGEX = /[A-z][A-z0-9_]*/;
+const IDENTIFIER_START_REGEX = /[A-Za-z]/;
+const IDENTIFIER_CHAR_REGEX = /[A-Za-z0-9_]/;
+const IDENTIFIER_REGEX = /[A-Za-z][A-z0-9_]*/;
 
 const BRACKETS_OPERATORS_REGEX = /[\(\)\+\-\*\/\!\&\|\=\>\<\%]/;
 const SPACE_BRACKETS_OPERATORS_REGEX = /[\t \(\)\+\-\*\/\!\&\|\=\>\<\%]/;
