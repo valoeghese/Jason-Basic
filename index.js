@@ -166,7 +166,7 @@ async function djMsg(message, content, send) {
 	}
 
 	// send the message and/or errors
-	send({
+	message.reply({
 		content: removeNonBlank(resultMsg),
 		allowedMentions: ALLOWED_MENTIONS
 	});
