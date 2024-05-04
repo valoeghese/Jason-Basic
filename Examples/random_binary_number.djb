@@ -8,7 +8,7 @@ i = 0
 DIM digitArray digits
 
 // this loop generates either a 0 or 1 for each digit in the array
-generateInt:
+GENERATE_INT:
     // a placeholder variable is needed for each digit in the array to get around missing functionality in DJ Basic
     digit = digitArray(i)
     // generate a random number from 0 to 1 (including decimals)
@@ -26,13 +26,13 @@ generateInt:
 
     // logic to end loop
     IF i < digits
-        GOTO generateInt
+        GOTO GENERATE_INT
     ELSE
-        GOTO printFinalInt
+        GOTO PRINT_FINAL_INT
     END IF
 
 // hardcoded since no dynamic variables
-printFinalInt:
+PRINT_FINAL_INT:
 i = 0
 digit1 = digitArray(i)
 i = i+1
