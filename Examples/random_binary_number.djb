@@ -19,8 +19,8 @@ generateInt:
     UPPERCASE digit
     // transfer the value in the temporary digit back into the array at value i
     digitArray(i) = digit
-    // debug
-    PRINT "This is digitArray: " + digitArray(i)
+    // debug - uncomment the line below to see each digit printed line per line
+    // PRINT "This is digitArray at index " + i + ": " + digitArray(i)
 
     i = i + 1
 
