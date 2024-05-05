@@ -92,7 +92,7 @@ Yep that's right folks. Single equals for both assign and compare.
 
 There are some built in operations you can use.
 
-Note that things that require a variable nmae
+Note that things that require a variable name can't take items in arrays (yet). If you need to e.g. generate a random number in an array, use a temp variable.
 
 ### I/O
 ```
