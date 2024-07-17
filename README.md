@@ -1,4 +1,4 @@
-# Daddy Jason Basic
+# Jason Basic
 
 High quality programming language to implement the most important programs in.
 
