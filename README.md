@@ -64,6 +64,14 @@ WHILE expression
 END WHILE
 ```
 
+FOR each loop
+Allows you to iterate over the elements of an array or the characters of a string.
+In the future I plan to let you use an expression after IN instead of requiring a variable.
+```
+FOR iterator IN iterableVariable
+END FOR
+```
+
 Labels and `GOTO`. Labels must follow the same naming standards as variables. 
 ```
 Place:
