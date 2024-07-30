@@ -121,7 +121,7 @@ async function run(procedure, io) {
 				variables[instruction.var] = await io.in(instruction.expression(variables));
 				break;
 			case "JUMP":
-				jmpIndex = labels[instruction.label];
+				jmpIndex = labels[instruction.expression(variables)];
 				await yieldControl();
 
 				if (jmpIndex != undefined) {

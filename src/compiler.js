@@ -172,13 +172,19 @@ async function decode(lnm, tokens, globals, io) {
                 return [{"type": "INPUT", "line": lnm, "expression": compiledExpression, "var": variable.value}];
             case "GOTO":
                 if (tokens.length === 0) throw exception(lnm, "GOTO requires a label but none given!");
-                if (tokens.length > 1) throw exception(lnm, "Too many operands! GOTO requires exactly one label and no other operands.");
-                
-                let label = tokens[0];
+                if (tokens.length > 1) {
+                    // dynamic jump
+                    return [{"type": "JUMP", "line": lnm, "expression": vars => 0}];
+                } else {
+                    // static jump
+                    let label = tokens[0];
 
-                if (label.type !== "VAR") throw exception(lnm, `Not a valid label identifier: ${label.value}`);
+                    if (label.type !== "VAR") throw exception(lnm, `Not a valid label identifier: ${label.value}`);
 
-                return [{"type": "JUMP", "line": lnm, "label": label.value}];
+                    // compile tokens to expression and use as jump target
+                    let jump = await simpleExpression(lnm, "JUMP", tokens, io);
+                    return [jump];
+                }
             case "IF":
                 if (tokens.length === 0) throw exception(lnm, "IF requires an operand but none given!");
 
@@ -260,7 +266,7 @@ async function decode(lnm, tokens, globals, io) {
                     // pop the if statement and set its label target to here, and place this one on the if stack here as a JUMP
                     // make sure to put the JUMP before the else label as if jumps before it reaches else label
                     
-                    let elseJmp = {"type": "JUMP", "line": lnm, "label": "ELSE" + ifToElse.label}; // see comment above and/or comments on return for more detail
+                    let elseJmp = {"type": "JUMP", "line": lnm, "expression": vars => "ELSE" + ifToElse.label}; // see comment above and/or comments on return for more detail
                     elseJmp.block = "IF"; // yessir this is indeed an if
                     globals.blockstack.push(elseJmp); // push else as an imposter onto the if stack (sus)
 
@@ -311,7 +317,7 @@ async function decode(lnm, tokens, globals, io) {
                         
                         // create the GOTO to loop to the top, and a label to jump to for when the condition is false
                         return [
-                            {"type": "JUMP", "line": lnm, "label": "@WHILE_START" + whileToEnd.whileid},
+                            {"type": "JUMP", "line": lnm, "expression": vars => "@WHILE_START" + whileToEnd.whileid},
                             {"type": "LABEL", "line": lnm, "label": whileToEnd.label}
                         ];
                     case "FOR":
@@ -328,7 +334,7 @@ async function decode(lnm, tokens, globals, io) {
 
                         return [
                             {"type": "VAR", "line": lnm, "var": forI, "expression": vars => vars[forI] + 1},
-                            {"type": "JUMP", "line": lnm, "label": "@FOR_START" + forToEnd.forId},
+                            {"type": "JUMP", "line": lnm, "expression": vars => "@FOR_START" + forToEnd.forId},
                             {"type": "LABEL", "line": lnm, "label": forToEnd.label}
                         ];
                     default:
