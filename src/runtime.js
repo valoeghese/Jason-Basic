@@ -104,6 +104,11 @@ async function run(procedure, io) {
 			case "LABEL":
 				// labels are handled prior to execution
 				break;
+			case "ASSERT":
+				// can be used by the compiler to verify things at runtime
+				// simply throw a runtime exception in the expression evaluation
+				instruction.expression(variables);
+				break;
 			case "PRINT":
 				//console.log(instruction);
 				//console.log(variables);

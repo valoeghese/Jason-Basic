@@ -1,5 +1,5 @@
 const MAX_DEPTH = 42;
-const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND", "LOWERCASE", "UPPERCASE", "DIM", "WHILE", "REM"];
+const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND", "LOWERCASE", "UPPERCASE", "DIM", "WHILE", "REM", "FOR", "IN"];
 
 function exception(lineNum, msg) {
 	return "Syntax Error at line " + lineNum + ":\n>> " + msg;
@@ -7,6 +7,15 @@ function exception(lineNum, msg) {
 
 function runtimeException(lineNum, msg) {
 	return "Exception at line " + lineNum + ":\n>> " + msg;
+}
+
+// https://stackoverflow.com/questions/18884249/checking-whether-something-is-iterable
+function isIterable(obj) {
+    // checks for null and undefined
+    if (obj == null) {
+        return false;
+    }
+    return typeof obj[Symbol.iterator] === 'function';
 }
 
 // Parameters
@@ -17,9 +26,10 @@ function runtimeException(lineNum, msg) {
 // - the parsed executable instruction for this line
 async function decode(lnm, tokens, globals, io) {
 	// initialise globals if first time
-	if (globals.blockstack == undefined) globals.blockstack = []; // if stack
+	if (globals.blockstack == undefined) globals.blockstack = []; // if/while/for stack
 	if (globals.ifid == undefined) globals.ifid = 0; // free if id tracker, for sections. To ensure unique names.
 	if (globals.whileid == undefined) globals.whileid = 0; // free while id tracker, for sections. To ensure unique names.
+	if (globals.forid == undefined) globals.forid = 0; // free for id tracker, for sections. To ensure unique names.
 
 	let head = tokens.shift(); // remove first token
     
@@ -188,6 +198,50 @@ async function decode(lnm, tokens, globals, io) {
 
                 globals.blockstack.push(whileJmp); // push this onto the block stack
                 return [{"type": "LABEL", "line": lnm, "label": "@WHILE_START" + whileJmp.whileid}, whileJmp];
+            case "FOR":
+                if (tokens.length !== 4) throw exception(lnm, "FOR requires four operands: FOR iter IN array");
+
+                // read tokens
+                let iterator = tokens[1];
+                if (iterator.type != "VAR") throw exception(lnm, "FOR iterator variable is not a valid variable name!");
+
+                // read IN
+                let token_in = tokens[2];
+                if (token_in.type !== "KEYWORD" || token_in.value !== "IN") throw exception(lnm, "Invalid FOR syntax. Valid syntax: FOR iter IN array");
+
+                // read array
+                let iterated = tokens[3];
+                if (iterated.type != "VAR") throw exception(lnm, "FOR array variable is not a valid variable name!");
+
+                // numerical iterator name
+                let forIterVarName = `@FOR_I${forJmp.forId}`;
+                
+                // create jump
+                forJmp = {"type": "JUMP_IFN", "line": lnm, "expression": vars => vars[forIterVarName] < vars[iterated.value].length};
+                forJmp.block = "FOR";
+                forJmp.forId = globals.forId++; // next one
+                forJmp.label = "@FOR_END" + forJmp.forId; // jump to here if false
+
+                globals.blockstack.push(forJmp); // push this onto the block stack
+
+                // 5 instructions: iterator initialisation, start label, array verification, conditional jump to end, and element-iterator assign
+
+                return [
+                    // pre-loop
+                    {"type": "VAR", "line": lnm, "var": forIterVarName, "expression": vars => 0},
+                    {"type": "LABEL", "line": lnm, "label": `@FOR_START${forJmp.forId}`},
+                    // loop start
+                    {"type": "ASSERT", "line": lnm, "expression": vars => {
+                        if (vars[iterated.value] == null) {
+                            throw runtimeException(lnm, `Variable ${iterated.value} is not defined!`);
+                        }
+                        if (!isIterable(vars[iterated.value])) {
+                            throw runtimeException(lnm, `Variable ${iterated.value} is not iterable!`);
+                        }
+                    }},
+                    forJmp,
+                    {"type": "VAR", "line": lnm, "var": iterator.value, "expression": vars => vars[iterated.value][vars[forIterVarName]]}
+                ];
             case "ELSE":
                 if (tokens.length === 0) {
                     if (globals.blockstack.length == 0) {
@@ -258,6 +312,23 @@ async function decode(lnm, tokens, globals, io) {
                         return [
                             {"type": "JUMP", "line": lnm, "label": "@WHILE_START" + whileToEnd.whileid},
                             {"type": "LABEL", "line": lnm, "label": whileToEnd.label}
+                        ];
+                    case "FOR":
+                        // cannot end for if there's no for
+                        if (globals.blockstack.length == 0) {
+                            throw exception(lnm, "Ending for when there's no matching FOR to end!");
+                        }
+
+                        let forToEnd = globals.blockstack.pop();
+                        if (forToEnd.block != "FOR") throw exception(lnm, "Current block being ended is not a FOR block!");
+                        
+                        // create the increment, the GOTO to loop to the top, and a label to jump to when the condition is false
+                        const forI = `@FOR_I${forToEnd.forId}`;
+
+                        return [
+                            {"type": "VAR", "line": lnm, "var": forI, "expression": vars => vars[forI] + 1},
+                            {"type": "JUMP", "line": lnm, "label": "@FOR_START" + forToEnd.forId},
+                            {"type": "LABEL", "line": lnm, "label": forToEnd.label}
                         ];
                     default:
                         throw exception(lnm, "This should be unreachable. Contact @Valoeghese if you see this.");
