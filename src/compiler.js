@@ -174,16 +174,17 @@ async function decode(lnm, tokens, globals, io) {
                 if (tokens.length === 0) throw exception(lnm, "GOTO requires a label but none given!");
                 if (tokens.length > 1) {
                     // dynamic jump
-                    return [{"type": "JUMP", "line": lnm, "expression": vars => 0}];
+
+                    // compile tokens to expression and use as jump target
+                    let jump = await simpleExpression(lnm, "JUMP", tokens, io);
+                    return [jump];
                 } else {
                     // static jump
                     let label = tokens[0];
 
                     if (label.type !== "VAR") throw exception(lnm, `Not a valid label identifier: ${label.value}`);
 
-                    // compile tokens to expression and use as jump target
-                    let jump = await simpleExpression(lnm, "JUMP", tokens, io);
-                    return [jump];
+                    return [{"type": "JUMP", "line": lnm, "expression": vars => label.value}];
                 }
             case "IF":
                 if (tokens.length === 0) throw exception(lnm, "IF requires an operand but none given!");
