@@ -199,28 +199,29 @@ async function decode(lnm, tokens, globals, io) {
                 globals.blockstack.push(whileJmp); // push this onto the block stack
                 return [{"type": "LABEL", "line": lnm, "label": "@WHILE_START" + whileJmp.whileid}, whileJmp];
             case "FOR":
-                if (tokens.length !== 4) throw exception(lnm, "FOR requires four operands: FOR iter IN array");
+                if (tokens.length !== 3) throw exception(lnm, "FOR requires four operands: FOR iter IN array");
 
                 // read tokens
-                let iterator = tokens[1];
+                let iterator = tokens[0];
                 if (iterator.type != "VAR") throw exception(lnm, "FOR iterator variable is not a valid variable name!");
 
                 // read IN
-                let token_in = tokens[2];
+                let token_in = tokens[1];
                 if (token_in.type !== "KEYWORD" || token_in.value !== "IN") throw exception(lnm, "Invalid FOR syntax. Valid syntax: FOR iter IN array");
 
                 // read array
-                let iterated = tokens[3];
+                let iterated = tokens[2];
                 if (iterated.type != "VAR") throw exception(lnm, "FOR array variable is not a valid variable name!");
 
                 // numerical iterator name
-                let forIterVarName = `@FOR_I${forJmp.forId}`;
+                const forId = globals.forId++;
+                let forIterVarName = `@FOR_I${forId}`;
                 
                 // create jump
                 forJmp = {"type": "JUMP_IFN", "line": lnm, "expression": vars => vars[forIterVarName] < vars[iterated.value].length};
                 forJmp.block = "FOR";
-                forJmp.forId = globals.forId++; // next one
-                forJmp.label = "@FOR_END" + forJmp.forId; // jump to here if false
+                forJmp.forId = forId; // next one
+                forJmp.label = "@FOR_END" + forId; // jump to here if false
 
                 globals.blockstack.push(forJmp); // push this onto the block stack
 
@@ -229,7 +230,7 @@ async function decode(lnm, tokens, globals, io) {
                 return [
                     // pre-loop
                     {"type": "VAR", "line": lnm, "var": forIterVarName, "expression": vars => 0},
-                    {"type": "LABEL", "line": lnm, "label": `@FOR_START${forJmp.forId}`},
+                    {"type": "LABEL", "line": lnm, "label": `@FOR_START${forId}`},
                     // loop start
                     {"type": "ASSERT", "line": lnm, "expression": vars => {
                         if (vars[iterated.value] == null) {
@@ -279,8 +280,8 @@ async function decode(lnm, tokens, globals, io) {
 
                 let target = tokens.shift(); // remove next token as the target of END
 
-                if (target.type !== "KEYWORD" || (target.value !== "IF" && target.value !== "WHILE")) {
-                    throw exception(lnm, `Unexpected token ${target.value} of type ${target.type} after END. Only IF and WHILE are allowed.`);
+                if (target.type !== "KEYWORD" || (target.value !== "IF" && target.value !== "WHILE" && target.value !== "FOR")) {
+                    throw exception(lnm, `Unexpected token ${target.value} of type ${target.type} after END. Only IF, FOR and WHILE are allowed.`);
                 }
 
                 if (tokens.length > 0) {
