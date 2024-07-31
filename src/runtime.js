@@ -68,8 +68,6 @@ async function run(procedure, io) {
 		i++; // increment index
 	}
 
-	//console.log(instructions);
-
 	i = 0; // rewind for labling
 	await io.debug("Indexing Labels...");
 
@@ -121,8 +119,18 @@ async function run(procedure, io) {
 				variables[instruction.var] = await io.in(instruction.expression(variables));
 				break;
 			case "JUMP":
+				jmpIndex = labels[instruction.label];
+				await yieldControl();
+
+				if (jmpIndex != undefined) {
+					i = jmpIndex - 1; // thought this was neater than continue;
+				}
+				else {
+					throw exception(instruction.line, "Unknown label \"" + instruction.label + '"');
+				}
+				break;
+			case "JUMP_DYNAMIC":
 				jmpIndex = labels[instruction.expression(variables)];
-				//await io.out(instruction["type"] + " " + instruction["expression"](variables) + " . Labels: " + Object.keys(labels));
 				await yieldControl();
 
 				if (jmpIndex != undefined) {
