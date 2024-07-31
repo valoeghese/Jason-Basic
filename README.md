@@ -80,7 +80,9 @@ GOTO Place
 # This will create an infinite loop!
 ```
 
-GOTO value in expression
+Dynamic GOTO
+`GOTO (expression)`
+
 If a single variable is provided, it is assumed to be a label.
 If more tokens are provided, Jason Basic will assume it is an expression that resolves in a label name.
 For readability, it is recommended to surround the expression in `()` when this is intended.
