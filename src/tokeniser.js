@@ -61,7 +61,8 @@ function createRegexParser(regex, type) {
 
 	// prevent improper parsers being created
 	if (!regex.source.startsWith("^")) {
-		throw "Regex is missing string-start operator '^'";
+		// add string start operator
+		regex = new RegExp(`^${regex.source}`, regex.flags);
 	}
 
 	return (expression, ptr) => {
@@ -87,7 +88,7 @@ const NUMBERS_REGEX = /[0-9]+/;
 
 // Define the handlers, in priority order
 const HANDLERS = [
-	createRegexParser(/\w+/, null), // whitespace consumer
+	createRegexParser(/\s+/, null), // whitespace consumer
 	parseString,
 	createRegexParser(IDENTIFIER_REGEX, TYPE_VAR),
 	createRegexParser(BRACKETS_OPERATORS_REGEX, TYPE_OPERATOR),
@@ -110,11 +111,11 @@ async function tokenise(lnm, expression, keywords) {
 				if (response !== null) {
 					const [token, newPtr] = response;
 					
-					if (newPtr) {
+					if (ptr == newPtr) {
 						throw tokeniserError(`Tokeniser handler ${id} parsed expression but did not consume any characters?!`);
 					}
 
-					if (token) tokens.push(token);
+					if (token.type) tokens.push(token);
 					ptr = newPtr;
 				}
 			}

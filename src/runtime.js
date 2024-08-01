@@ -61,6 +61,7 @@ async function run(procedure, io) {
             }
 		} else {
             let tokens = await tokeniser.tokenise(lnm, line, compiler.KEYWORDS);
+			// Debug Tokeniser: io.out(tokens.map(value => `${value.type}:${value.value}`).join(" "));
 			let decoded = await compiler.decode(lnm, tokens, decode_Globals, io); // decode into list of instructions
 			instructions.push(...decoded); // append
         }
