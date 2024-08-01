@@ -18,12 +18,56 @@ function isIterable(obj) {
     return typeof obj[Symbol.iterator] === 'function';
 }
 
+
+// Read a variable target from the tokens
+// Either a variable, or an array/string, indexed.
+// Parameters
+// - lnm = the linenumber of this instruction
+// - head = the head token
+// - tokens = the remaining tokens
+// Returns
+// - a function to create a variable assign instruction
+//    * arg0: expression [vars => value]. The function to determine what to assign the variable to.
+//    * arg1: the dependents of the expression.
+async function readVarTarget(lnm, head, tokens, io) {
+    // ensure head token is variable
+    if (head.type !== "VAR") {
+        throw exception(lnm, `Unexpected token '${head.value}'; expected variable target.`);
+    }
+    
+    // detect array target
+    if (tokens.length > 0 && tokens[0].type === "OPERATOR" && tokens[0].value === "(") {
+        tokens.shift(); // consume the '('
+
+        // Element Assignment
+        const ixDependents = new Set();
+        let indexExpression = await compileExpression(lnm, tokens, io, ixDependents, 1 /* consume matching closing bracket */);
+
+        return (expression, dependents) => {
+            const allDependents = new Set([...dependents, ...ixDependents]);
+
+            return [
+                assertVariablesExist(lnm, allDependents),
+                {"type": "ASSIGN_ELEMENT", "line": lnm, "var": head.value, "index": indexExpression, "expression": expression}
+            ];
+        };
+    }
+    // variable target
+    else {
+        return (expression, dependents) =>
+            [
+                assertVariablesExist(lnm, dependents),
+                {"type": "VAR", "line": lnm, "var": head.value, "expression": expression}
+            ];
+    }
+}
+
 // Parameters
 // - lnm = the line number of this instruction
 // - tokens = the tokens to parse
 // - globals (READ/WRITE) = a map shared across the compilation of a procedure, to keep track of state
 // Returns
-// - the parsed executable instruction for this line
+// - the parsed executable instructions for this line
 async function decode(lnm, tokens, globals, io) {
 	// initialise globals if first time
 	if (globals.blockstack == undefined) globals.blockstack = []; // if/while/for stack
@@ -34,43 +78,30 @@ async function decode(lnm, tokens, globals, io) {
 	let head = tokens.shift(); // remove first token
     
     if (head.type === "VAR") {
+        // Target
+        const assignFactory = await readVarTarget(lnm, head, tokens, io);
+
+        // next should be =
         if (tokens.length === 0) throw exception(lnm, `Unexpected token '${head.value}'. Did you mean to assign a variable?`);
-        
-        // variable assignment
+
+        // variable assignment. expect '='
         let operation = tokens.shift();
 
-        if (operation.type !== "OPERATOR") {
-            throw exception(lnm, `Unexpected token '${operation.value}'.`);
+        if (operation.type !== "OPERATOR" || operation.value !== "=") {
+            throw exception(lnm, `Unexpected token '${operation.value}'. Expected '='.`);
         }
 
-        if (operation.value === "=") {
-            // Regular variable assignment
-            return await assignVariable(lnm, head.value, tokens, io);
-        } else if (operation.value === "(") {
-            // Element Assignment
-            let indexExpression = await compileExpression(lnm, tokens, io, 1);
-
-            // tokens should be at the closing bracket, next is =
-            if (tokens.length === 0) throw exception(lnm, "Expected '=' for element assignment.");
-            
-            operation = tokens.shift();
-
-            if (operation.type === "OPERATOR" && operation.value === '=') {
-                return [{"type": "ASSIGN_ELEMENT", "line": lnm, "var": head.value, "index": indexExpression, "expression": await compileExpression(lnm, tokens, io)}];
-            }
-            else {
-                throw exception(lnm, `Unexpected token '${operation.value}'.`);
-            }
-        } else {
-            throw exception(lnm, `Unexpected token '${operation.value}'.`);
-        }
+        // Compile expression
+        const dependents = new Set();
+        const expression = await compileExpression(lnm, tokens, io, dependents);
+        return assignFactory(expression, dependents);
     }
     else if (head.type === "KEYWORD") {
         // Instructions are case sensitive
         switch (head.value) {
             case "PRINT":
                 if (tokens.length === 0) throw exception(lnm, "PRINT requires an operand but none given!");
-                return [await simpleExpression(lnm, "PRINT", tokens, io)];
+                return await simpleExpression(lnm, "PRINT", tokens, io);
             case "RANDOM":
                 //console.log(expression);
                 if (tokens.length === 0) throw exception(lnm, "RANDOM requires a variable but none given!");
@@ -112,7 +143,7 @@ async function decode(lnm, tokens, globals, io) {
                 else {
                     throw exception(lnm, "Invalid variable name to perform UPPERCASE operation on.")
                 }
-            case "DIM":
+            case "DIM": {
                 if (tokens.length < 2) throw exception(lnm, "DIM requires a variable name and a size expression.");
                 
                 // get variable name and ensure it is a variable name
@@ -121,9 +152,10 @@ async function decode(lnm, tokens, globals, io) {
                 if (arrayVarToken.type !== "VAR")
                     throw exception(lnm, `Not a variable name: ${arrayVarToken.value}`);
 
-                let expressionCalculator = await compileExpression(lnm, tokens, io);
+                const dependents = new Set();
+                let expressionCalculator = await compileExpression(lnm, tokens, io, dependents);
 
-                return [{"type": "VAR", "line": lnm, "var": arrayVarToken.value, "expression": vars => {
+                return [assertVariablesExist(lnm, dependents), {"type": "VAR", "line": lnm, "var": arrayVarToken.value, "expression": vars => {
                     let size = expressionCalculator(vars);
 
                     if (size < 0) {
@@ -139,7 +171,7 @@ async function decode(lnm, tokens, globals, io) {
 
                     return new_array;
                 }}];
-                break;
+            }
             case "INPUT":
                 if (tokens.length === 0) throw exception(lnm, "INPUT requires an operand but none given!");
 
@@ -154,11 +186,15 @@ async function decode(lnm, tokens, globals, io) {
                     }
                 }
 
-                if (toIndex == -1) return [{"type": "INPUT_DISCARD", "line": lnm, "expression": await compileExpression(lnm, tokens, io)}];
+                if (toIndex == -1) {
+                    return await simpleExpression(lnm, "INPUT_DISCARD", tokens, io);
+                };
 
                 let spliced = tokens.splice(0, toIndex);
                 //console.log(spliced);
-                let compiledExpression = await compileExpression(lnm, spliced, io); // splice the expression to compile out
+
+                const dependents = new Set();
+                let compiledExpression = await compileExpression(lnm, spliced, io, dependents); // splice the expression to compile out
 
                 // remainder should be "TO" + variable
                 if (tokens.length != 2) {
@@ -176,8 +212,7 @@ async function decode(lnm, tokens, globals, io) {
                     // dynamic jump
 
                     // compile tokens to expression and use as jump target
-                    let jump = await simpleExpression(lnm, "JUMP_DYNAMIC", tokens, io);
-                    return [jump];
+                    return await simpleExpression(lnm, "JUMP_DYNAMIC", tokens, io);
                 } else {
                     // static jump
                     let label = tokens[0];
@@ -189,22 +224,24 @@ async function decode(lnm, tokens, globals, io) {
             case "IF":
                 if (tokens.length === 0) throw exception(lnm, "IF requires an operand but none given!");
 
-                ifJmp = await simpleExpression(lnm, "JUMP_IFN", tokens, io);
+                const ifTokens = await simpleExpression(lnm, "JUMP_IFN", tokens, io);
+                const ifJmp = ifTokens[SIMPLE_EXPR_INSTRUCTION_INDEX];
                 ifJmp.block = "IF";
                 ifJmp.label = "@IF" + (globals.ifid++); // set to current and increment to next free one. @ for synthetic sections as it's an invalid label character
 
                 globals.blockstack.push(ifJmp); // push this onto the block stack
-                return [ifJmp];
+                return ifTokens;
             case "WHILE":
                 if (tokens.length === 0) throw exception(lnm, "WHILE requires an operand but none given!");
 
-                whileJmp = await simpleExpression(lnm, "JUMP_IFN", tokens, io);
+                const whileTokens = await simpleExpression(lnm, "JUMP_IFN", tokens, io);
+                const whileJmp = whileTokens[SIMPLE_EXPR_INSTRUCTION_INDEX];
                 whileJmp.block = "WHILE";
                 whileJmp.whileid = globals.whileid++; // next one
                 whileJmp.label = "@WHILE_END" + whileJmp.whileid; // jump to here if false
 
                 globals.blockstack.push(whileJmp); // push this onto the block stack
-                return [{"type": "LABEL", "line": lnm, "label": "@WHILE_START" + whileJmp.whileid}, whileJmp];
+                return [{"type": "LABEL", "line": lnm, "label": "@WHILE_START" + whileJmp.whileid}, ...whileTokens];
             case "FOR":
                 if (tokens.length !== 3) throw exception(lnm, "FOR requires four operands: FOR iter IN array");
 
@@ -225,7 +262,7 @@ async function decode(lnm, tokens, globals, io) {
                 let forIterVarName = `@FOR_I${forId}`;
                 
                 // create jump
-                forJmp = {"type": "JUMP_IFN", "line": lnm, "expression": vars => vars[forIterVarName] < vars[iterated.value].length};
+                const forJmp = {"type": "JUMP_IFN", "line": lnm, "expression": vars => vars[forIterVarName] < vars[iterated.value].length};
                 forJmp.block = "FOR";
                 forJmp.forId = forId; // next one
                 forJmp.label = "@FOR_END" + forId; // jump to here if false
@@ -353,8 +390,6 @@ async function decode(lnm, tokens, globals, io) {
 
 // these functions are called by the translated javascript expression in the eval
 function accessArray(lnm, arrayName, array, index) {
-	console.log("Accessing array " + arrayName);
-	
 	if (index < array.length && index >= 0) {
 		return array[index];
 	} else {
@@ -365,8 +400,9 @@ function accessArray(lnm, arrayName, array, index) {
 // lnm: line number
 // tokens: an array of the tokens to parse. tokens should be popped from the beginning
 // io: access to io
+// dependents: a set to store variables that need to exist
 // depth: the depth of the expression (in brackets.)
-function compileExpressionComponent(lnm, tokens, io, depth = 0) {
+function compileExpressionComponent(lnm, tokens, io, dependents, depth = 0) {
 	// max depth
 	if (depth > MAX_DEPTH) {
 		throw runtimeException(lnm, "Exceeded max bracket depth! (42)");
@@ -387,7 +423,7 @@ function compileExpressionComponent(lnm, tokens, io, depth = 0) {
 				jsExpression += token.value + token.value;
 			} else if (token.value === '(') {
 				// increase depth
-				jsExpression += '(' + compileExpressionComponent(lnm, tokens, io, depth + 1) + ')';
+				jsExpression += '(' + compileExpressionComponent(lnm, tokens, io, dependents, depth + 1) + ')';
 			} else if (token.value === ')') {
                 // if at root depth, unmatched )!
                 if (depth === 0) {
@@ -404,13 +440,14 @@ function compileExpressionComponent(lnm, tokens, io, depth = 0) {
 			jsExpression += '"' + token.value + '"';
 		}
 		else if (token.type == "VAR") {
+            dependents.add(token.value); // dependent variable.
 			let varAccess = "vars[\"" + token.value + "\"]";
 
 			// check token after in case it's indexing array '('
 			if (tokens.length > 0 && tokens[0].type === "OPERATOR" && tokens[0].value === '(') {
 				tokens.shift(); // consume the bracket to enter this array indexing state
 				
-				let indexExpression = compileExpressionComponent(lnm, tokens, io, depth + 1);
+				let indexExpression = compileExpressionComponent(lnm, tokens, io, dependents, depth + 1);
 				varAccess = `accessArray(${lnm}, "${token.value}", ${varAccess}, ${indexExpression})`;
 			}
 
@@ -437,8 +474,8 @@ function compileExpressionComponent(lnm, tokens, io, depth = 0) {
 // returns the expression to evaluate as a javascript function, transformed from the input
 // dont do this
 // we must be careful to not let people break the sandbox
-async function compileExpression(lnm, tokens, io, depth = 0) {
-	let jsExpression = "vars => " + compileExpressionComponent(lnm, tokens, io, depth);
+async function compileExpression(lnm, tokens, io, dependents, depth = 0) {
+	let jsExpression = "vars => " + compileExpressionComponent(lnm, tokens, io, dependents, depth);
 
 	try{
 		//console.log(jsExpression);
@@ -454,12 +491,25 @@ async function compileExpression(lnm, tokens, io, depth = 0) {
 
 // common operations
 
-async function simpleExpression(lnm, keyword, tokens, io) {
-	return {"type": keyword, "line": lnm, "expression": await compileExpression(lnm, tokens, io)};
+function assertVariablesExist(lnm, dependents) {
+    return {"type": "ASSERT", "line": lnm, "expression": vars => {
+        for (const dependent of dependents) {
+            if (vars[dependent] === undefined) {
+                throw runtimeException(lnm, `Undefined variable ${dependent}`);
+            }
+        }
+    }};
 }
 
-async function assignVariable(lnm, varName, tokens, io) {
-	return [{"type": "VAR", "line": lnm, "var": varName, "expression": await compileExpression(lnm, tokens, io)}];
+const SIMPLE_EXPR_INSTRUCTION_INDEX = 1;
+
+async function simpleExpression(lnm, type, tokens, io) {
+    const dependents = new Set();
+    const expression = await compileExpression(lnm, tokens, io, dependents);
+	return [
+        assertVariablesExist(lnm, dependents),
+        {"type": type, "line": lnm, "expression": expression}
+    ];
 }
 
 // define module exports
