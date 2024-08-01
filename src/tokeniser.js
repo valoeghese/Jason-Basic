@@ -1,14 +1,109 @@
+///// The Tokeniser /////
+// now v2: a lot more readable
+
+const TYPE_OPERATOR = "OPERATOR";
+const TYPE_SEPARATOR = "SEPARATOR";
+const TYPE_NUMBER = "NUMBER";
+const TYPE_STRING = "STRING";
+const TYPE_VAR = "VAR";
+const TYPE_KEYWORD = "KEYWORD";
+
 const IDENTIFIER_START_REGEX = /[A-Za-z]/;
 const IDENTIFIER_CHAR_REGEX = /[A-Za-z0-9_]/;
 const IDENTIFIER_REGEX = /[A-Za-z][A-z0-9_]*/;
 
 const BRACKETS_OPERATORS_REGEX = /[\(\)\+\-\*\/\!\&\|\=\>\<\%]/;
 const SPACE_BRACKETS_OPERATORS_REGEX = /[\t \(\)\+\-\*\/\!\&\|\=\>\<\%]/;
+const SEPARATORS_REGEX = /,/;
 const NUMBERS_REGEX = /[0-9]/;
 
-// the tokeniser
-// the least readable part of this code :(
+///// Utility Functions /////
+function syntaxException(msg) {
+	return {
+		"type": "Syntax Error",
+		"message": msg
+	}
+}
+
+function tokeniserError(msg) {
+	return {
+		"type": "Tokeniser Error",
+		"message": msg
+	}
+}
+
+///// Tokenising Task Functions /////
+function parseString(expression, ptr) {
+	/* Tester */
+	if (expression[ptr++] !== "\"") {
+		return null; // try next parser
+	}
+
+	/* Parser */
+	let escape = false;
+	let stringAccumulator = "";
+
+	while (ptr < expression.length) {
+		let c = expression[ptr++];
+
+		if (escape) {
+			stringAccumulator += c;
+		} else if (c == "\"") {
+			return [{
+				"type": TYPE_STRING,
+				"value": stringAccumulator
+			}, ptr];
+		} else if (c == "\\") {
+			escape = true;
+		} else {
+			stringAccumulator += c;
+		}
+	}
+
+	throw syntaxException("Unclosed string");
+}
+
+function createRegexParser(regex, type) {
+	// prevent improper parsers being created
+	if (!regex.source.startsWith("^")) {
+		throw "Regex is missing string-start operator '^'";
+	}
+
+	return (expression, ptr) => {
+		const testString = expression.substring(ptr);
+		const match = regex.exec(testString);
+
+		/* Tester */
+		if (!match || match.index !== 0) {
+			return null;
+		}
+		
+		/* Parser */
+		let value = testString.substring(0, match[0].length);
+		return [{type, value}, ptr + match[0].length]
+	};
+}
+
+// Define the handlers, in priority order
+const HANDLERS = [
+	parseString
+];
+
+///// Actual Tokeniser Function /////
 async function tokenise(lnm, expression, keywords) {
+	try {
+
+	} catch (e) {
+		if (e.type) {
+			throw `${e.type} Error at line ${lnm}:\n>> ${e.message}`;
+		} else {
+			throw e;
+		}
+	}
+}
+
+// the least readable part of this code :(
+async function tokenise0(lnm, expression, keywords) {
     function exception(lineNum, msg) {
         return "Syntax Error at line " + lineNum + ":\n>> " + msg;
     }
