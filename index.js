@@ -78,7 +78,13 @@ function removeNonBlank(msg) {
 	return msg.trim() == "" ? "_ _" : msg; // hax
 }
 
-async function djMsg(message, content, send_response) {
+async function djMsg(message, content, send_response, initial_state = null) {
+	if (message.reference && !initial_state) {
+		message.channel.messages.fetch(message.reference.messageId)
+			.then(_replied => djMsg(message, content, send_response, _replied.content ?? ""));
+		return;
+	}
+
 	let script = "";
 	let input = [];
 
@@ -153,7 +159,7 @@ async function djMsg(message, content, send_response) {
 	// run the script to create a message
 	try {
 		//console.log(script);
-		await runtime.run(script, messageContextIO);
+		await runtime.run(script, messageContextIO, initial_state ?? {});
 	} catch (e) {
 		console.log(e);
 
@@ -261,7 +267,7 @@ client.on("messageCreate", async (message) => {
 					try {
 						const script = await response.text();
 						//console.log(script);
-						await runtime.run(script.split(/\r?\n/), scriptContextIO);
+						await runtime.run(script.split(/\r?\n/), scriptContextIO, {});
 					} catch (e) {
 						console.log(e);
 						scriptContextIO.error(e);

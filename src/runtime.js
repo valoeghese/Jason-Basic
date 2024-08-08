@@ -5,8 +5,7 @@ const LABEL_REGEX = /[A-z0-9 ]+/;
 
 // i comment my code very well thank you
 
-async function run(procedure, io) {
-	let variables = {};
+async function run(procedure, io, variables) {
 	let instructions = [];
 	let labels = {};
 
