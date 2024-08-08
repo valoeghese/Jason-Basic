@@ -81,7 +81,7 @@ function removeNonBlank(msg) {
 async function djMsg(message, content, send_response, initial_state = null) {
 	if (message.reference && !initial_state) {
 		message.channel.messages.fetch(message.reference.messageId)
-			.then(_replied => djMsg(message, content, send_response, _replied.content ?? ""));
+			.then(_replied => djMsg(message, content, send_response, {"content": _replied.content ?? ""}));
 		return;
 	}
 
