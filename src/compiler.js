@@ -402,7 +402,7 @@ async function decode(lnm, tokens, globals, io) {
                         throw exception(lnm, "This should be unreachable. Contact @Valoeghese if you see this.");
                 }
             default: // catch-all
-                throw exception(lnm, "Unable to parse line \"" + instruction + "\" (with assumed instruction of \"" + splitInstr[0] + "\")... is this correct syntax for DJ BASIC?");
+                throw exception(lnm, "Unable to parse line starting with token \""  + `${head.value} (${head.type.toLowerCase()})` + "\"" + "... is this correct syntax for DJ BASIC?");
         }
     } else {
         throw exception(lnm, `Unable to parse instruction with head token ${head}`);
