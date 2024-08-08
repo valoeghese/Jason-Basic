@@ -1,5 +1,10 @@
 const MAX_DEPTH = 42;
-const KEYWORDS = ["PRINT", "INPUT", "TO", "GOTO", "IF", "ELSE", "END", "RANDOM", "ROUND", "LOWERCASE", "UPPERCASE", "DIM", "WHILE", "REM", "FOR", "IN"];
+const KEYWORDS = [
+    "PRINT", "INPUT", "TO",
+    "GOTO", "IF", "ELSE", "END", "WHILE", "FOR", "IN",
+    "RANDOM", "DIM",
+    "ROUND", "LOWERCASE", "UPPERCASE", "TONUMBER", "MATCH",
+    "REM"];
 
 function exception(lineNum, msg) {
 	return "Syntax Error at line " + lineNum + ":\n>> " + msg;
@@ -143,6 +148,24 @@ async function decode(lnm, tokens, globals, io) {
                 else {
                     throw exception(lnm, "Invalid variable name to perform UPPERCASE operation on.")
                 }
+            case "TONUMBER":
+                if (tokens.length === 0) throw exception(lnm, "TONUMBER requires a variable but none given!");
+                if (tokens.length > 1) throw exception(lnm, "Too many operands! TONUMBER requires exactly one variable and no other operands.");
+
+                if (tokens[0].type === "VAR") {
+                    return [{"type": "VAR", "line": lnm, "var": tokens[0].value, "expression": vars => {
+                        let val = vars[tokens[0].value];
+                        try {
+                            return parseFloat(val);
+                        } catch (e) {
+                            throw runtimeException(lnm, "Not a number: " + val);
+                        }
+                    }}];
+                }
+                else {
+                    throw exception(lnm, "Invalid variable name to perform TONUMBER operation on.")
+                }
+                // TODO regex MATCH
             case "DIM": {
                 if (tokens.length < 2) throw exception(lnm, "DIM requires a variable name and a size expression.");
                 
