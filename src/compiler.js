@@ -46,6 +46,7 @@ async function readVarTarget(lnm, head, tokens, io) {
 
         // Element Assignment
         const ixDependents = new Set();
+        ixDependents.add(head.value); // the array should already exist
         let indexExpression = await compileExpression(lnm, tokens, io, ixDependents, 1 /* consume matching closing bracket */);
 
         return [head.value, indexExpression, ixDependents];
