@@ -115,7 +115,7 @@ Yep that's right folks. Single equals for both assign and compare.
 
 There are some built in operations you can use.
 
-Note that things that require a variable name can't take items in arrays (yet). If you need to e.g. generate a random number in an array, use a temp variable.
+Builtins that require a variable name to store can take items in arrays (e.g. `a(0)`). This is useful for things such as generating a random number in an array.
 
 ### I/O
 ```
@@ -148,6 +148,11 @@ Convert variable to lowercase. Also implicitly converts to string, so can be use
 ROUND (variable name)
 ```
 Round the number in the given variable.
+
+```
+TONUMBER (variable name)
+```
+Convert the variable to a number. The current implementation follows javascript rules, but may get more strict in future releases. Please treat non-numeric values as undefined behaviour and handle your input carefully.
 
 ## Breakpoints
 Put * at the end of a line to make it print the values of every variable before every time it runs that line.

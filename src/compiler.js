@@ -165,7 +165,7 @@ async function decode(lnm, tokens, globals, io) {
                     return new_array;
                 }}];
             }
-            case "INPUT":
+            case "INPUT": {
                 if (tokens.length === 0) throw exception(lnm, "INPUT requires an operand but none given!");
 
                 let toIndex = -1;
@@ -183,23 +183,30 @@ async function decode(lnm, tokens, globals, io) {
                     return await simpleExpression(lnm, "INPUT_DISCARD", tokens, io);
                 };
 
-                let spliced = tokens.splice(0, toIndex);
-                //console.log(spliced);
-
-                const dependents = new Set();
-                let compiledExpression = await compileExpression(lnm, spliced, io, dependents); // splice the expression to compile out
-
+                let printExpression = tokens.splice(0, toIndex);
+                
                 // remainder should be "TO" + variable
-                if (tokens.length != 2) {
-                    throw exception(lnm, "Incorrect number of operands after INPUT ... TO. Must have exactly ONE variable to store in.")
+                // remove TO token
+                tokens.shift();
+
+                // Target
+                let [variable, indexExpression, dependents] = await readVarTarget(lnm, tokens.shift(), tokens, io);
+
+                // Should have no more arguments
+                if (tokens.length > 0) {
+                    throw exception(lnm, `Too many operands! INPUT requires exactly one target and no other operands.`);
                 }
 
-                let variable = tokens[1];
+                if (!dependents) dependents = new Set();
+                let compiledExpression = await compileExpression(lnm, printExpression, io, dependents); // splice the expression to compile out
 
-                if (variable.type != "VAR") throw exception(lnm, "Operand after INPUT ... TO is not a valid variable name!");
+                let inputToken = {"type": "INPUT", "line": lnm, "expression": compiledExpression, "var": variable.value, "index": indexExpression};
 
-                return [{"type": "INPUT", "line": lnm, "expression": compiledExpression, "var": variable.value}];
-            case "GOTO":
+                return [
+                    assertVariablesExist(lnm, dependents),
+                    inputToken
+                ];
+            } case "GOTO":
                 if (tokens.length === 0) throw exception(lnm, "GOTO requires a label but none given!");
                 if (tokens.length > 1) {
                     // dynamic jump

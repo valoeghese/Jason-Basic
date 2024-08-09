@@ -116,7 +116,13 @@ async function run(procedure, io, variables) {
 				await io.in(instruction.expression(variables));
 				break;
 			case "INPUT":
-				variables[instruction.var] = await io.in(instruction.expression(variables));
+				let inputReceived = await io.in(instruction.expression(variables));
+
+				if (instruction.index) {
+					variables[instruction.var][instruction.index(variables)] = inputReceived;
+				} else {
+					variables[instruction.var] = inputReceived;
+				}
 				break;
 			case "JUMP":
 				jmpIndex = labels[instruction.label];
