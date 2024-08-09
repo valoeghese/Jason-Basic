@@ -31,9 +31,9 @@ function isIterable(obj) {
 // - head = the head token
 // - tokens = the remaining tokens
 // Returns
-// - a function to create a variable assign instruction
-//    * arg0: expression [vars => value]. The function to determine what to assign the variable to.
-//    * arg1: the dependents of the expression.
+// - variable = the variable to which to write
+// - indexExpression = the index expression. null if it was a variable
+// - ixDependents = the index expression dependents. null if it was a variable
 async function readVarTarget(lnm, head, tokens, io) {
     // ensure head token is variable
     if (head.type !== "VAR") {
@@ -48,21 +48,36 @@ async function readVarTarget(lnm, head, tokens, io) {
         const ixDependents = new Set();
         let indexExpression = await compileExpression(lnm, tokens, io, ixDependents, 1 /* consume matching closing bracket */);
 
-        return (expression, dependents) => {
-            const allDependents = new Set([...dependents, ...ixDependents]);
-
-            return [
-                assertVariablesExist(lnm, allDependents),
-                {"type": "ASSIGN_ELEMENT", "line": lnm, "var": head.value, "index": indexExpression, "expression": expression}
-            ];
-        };
+        return [head.value, indexExpression, ixDependents];
     }
     // variable target
     else {
+        return [head.value, null, null];
+    }
+}
+
+// Read a variable target from the tokens
+// Either a variable, or an array/string, indexed.
+// Parameters
+// - lnm = the linenumber of this instruction
+// - variable = the variable to assign
+// - indexExpression = the expression to access the index, or null if assigning a variable
+// Returns
+// - a function to create a variable assign instruction
+//    * arg0: expression [vars => value]. The function to determine what to assign the variable to.
+//    * arg1: the dependents of the expression.
+function assignVarTarget(lnm, variable, indexExpression) {
+    if (indexExpression === null) {
         return (expression, dependents) =>
             [
                 assertVariablesExist(lnm, dependents),
-                {"type": "VAR", "line": lnm, "var": head.value, "expression": expression}
+                {"type": "VAR", "line": lnm, "var": variable, "expression": expression}
+            ];
+    } else {
+        return (expression, dependents) =>
+            [
+                assertVariablesExist(lnm, dependents),
+                {"type": "ASSIGN_ELEMENT", "line": lnm, "var": variable, "index": indexExpression, "expression": expression}
             ];
     }
 }
@@ -84,7 +99,7 @@ async function decode(lnm, tokens, globals, io) {
     
     if (head.type === "VAR") {
         // Target
-        const assignFactory = await readVarTarget(lnm, head, tokens, io);
+        const [variable, indexExpression, ixDependents] = await readVarTarget(lnm, head, tokens, io);
 
         // next should be =
         if (tokens.length === 0) throw exception(lnm, `Unexpected token '${head.value}'. Did you mean to assign a variable?`);
@@ -97,8 +112,10 @@ async function decode(lnm, tokens, globals, io) {
         }
 
         // Compile expression
-        const dependents = new Set();
+        const dependents = ixDependents ?? new Set();
         const expression = await compileExpression(lnm, tokens, io, dependents);
+
+        const assignFactory = assignVarTarget(lnm, variable, indexExpression);
         return assignFactory(expression, dependents);
     }
     else if (head.type === "KEYWORD") {
