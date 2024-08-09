@@ -124,72 +124,16 @@ async function decode(lnm, tokens, globals, io) {
             case "PRINT":
                 if (tokens.length === 0) throw exception(lnm, "PRINT requires an operand but none given!");
                 return await simpleExpression(lnm, "PRINT", tokens, io);
-            case "RANDOM": {
-                if (tokens.length === 0) throw exception(lnm, "RANDOM requires a variable but none given!");
-
-                // need var to start. readVarTarget already checks that
-                const [variable, indexExpression, dependents] = await readVarTarget(lnm, tokens.shift(), tokens, io);
-
-                if (tokens.length > 0) { // tokens should be consumed
-                    throw exception(lnm, "Too many operands! RANDOM requires exactly one target and no other operands.");
-                }
-
-                const assignFactory = assignVarTarget(lnm, variable, indexExpression);
-                return assignFactory(vars => Math.random(), dependents ?? new Set());
-            } case "ROUND": {
-                if (tokens.length === 0) throw exception(lnm, "ROUND requires a variable but none given!");
-                
-                // need var to start. readVarTarget already checks that
-                const [variable, indexExpression, ixDependents] = await readVarTarget(lnm, tokens.shift(), tokens, io);
-
-                if (tokens.length > 0) { // tokens should be consumed
-                    throw exception(lnm, "Too many operands! ROUND requires exactly one target and no other operands.");
-                }
-
-                const assignFactory = assignVarTarget(lnm, variable, indexExpression);
-                
-                if (indexExpression) {
-                    return assignFactory(vars => Math.round(vars[variable][indexExpression(vars)]), ixDependents);
-                } else {
-                    return assignFactory(vars => Math.round(vars[variable]), new Set());
-                }
-            } case "LOWERCASE":
-                if (tokens.length === 0) throw exception(lnm, "LOWERCASE requires a variable but none given!");
-                if (tokens.length > 1) throw exception(lnm, "Too many operands! LOWERCASE requires exactly one variable and no other operands.");
-
-                if (tokens[0].type === "VAR") {
-                    return [{"type": "VAR", "line": lnm, "var": tokens[0].value, "expression": vars => vars[tokens[0].value].toString().toLowerCase()}];
-                }
-                else {
-                    throw exception(lnm, "Invalid variable name to perform LOWERCASE operation on.")
-                }
+            case "RANDOM":
+                return await transformExpression(lnm, "RANDOM", tokens, io, old => Math.random());
+            case "ROUND":
+                return await transformExpression(lnm, "ROUND", tokens, io, old => Math.round(old));
+            case "LOWERCASE":
+                return await transformExpression(lnm, "LOWERCASE", tokens, io, old => old.toString().toLowerCase());
             case "UPPERCASE":
-                if (tokens.length === 0) throw exception(lnm, "UPPERCASE requires a variable but none given!");
-                if (tokens.length > 1) throw exception(lnm, "Too many operands! UPPERCASE requires exactly one variable and no other operands.");
-
-                if (tokens[0].type === "VAR") {
-                    return [{"type": "VAR", "line": lnm, "var": tokens[0].value, "expression": vars => vars[tokens[0].value].toString().toUpperCase()}];
-                }
-                else {
-                    throw exception(lnm, "Invalid variable name to perform UPPERCASE operation on.")
-                }
+                return await transformExpression(lnm, "UPPERCASE", tokens, io, old => old.toString().toUpperCase());
             case "TONUMBER":
-                if (tokens.length === 0) throw exception(lnm, "TONUMBER requires a variable but none given!");
-                if (tokens.length > 1) throw exception(lnm, "Too many operands! TONUMBER requires exactly one variable and no other operands.");
-
-                if (tokens[0].type === "VAR") {
-                    return [{"type": "VAR", "line": lnm, "var": tokens[0].value, "expression": vars => {
-                        let val = vars[tokens[0].value];
-                        try {
-                            return parseFloat(val);
-                        } catch (e) {
-                            throw runtimeException(lnm, "Not a number: " + val);
-                        }
-                    }}];
-                }
-                else {
-                    throw exception(lnm, "Invalid variable name to perform TONUMBER operation on.")
-                }
+                return await transformExpression(lnm, "TONUMBER", tokens, io, old => parseFloat(old));
                 // TODO regex MATCH
             case "DIM": {
                 if (tokens.length < 2) throw exception(lnm, "DIM requires a variable name and a size expression.");
@@ -558,6 +502,30 @@ async function simpleExpression(lnm, type, tokens, io) {
         assertVariablesExist(lnm, dependents),
         {"type": type, "line": lnm, "expression": expression}
     ];
+}
+
+// transformExpression
+// lnm = the line number
+// name = the name of the operation, for debug messages
+// tokens = the tokens after the initial operation
+// 
+async function transformExpression(lnm, name, tokens, io, transform) {
+    if (tokens.length === 0) throw exception(lnm, name + " requires a variable but none given!");
+                
+    // need var to start. readVarTarget already checks that
+    const [variable, indexExpression, ixDependents] = await readVarTarget(lnm, tokens.shift(), tokens, io);
+
+    if (tokens.length > 0) { // tokens should be consumed
+        throw exception(lnm, `Too many operands! ${name} requires exactly one target and no other operands.`);
+    }
+
+    const assignFactory = assignVarTarget(lnm, variable, indexExpression);
+    
+    if (indexExpression) {
+        return assignFactory(vars => transform(vars[variable][indexExpression(vars)]), ixDependents);
+    } else {
+        return assignFactory(vars => transform(vars[variable]), new Set());
+    }
 }
 
 // define module exports
