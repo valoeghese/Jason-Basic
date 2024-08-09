@@ -200,7 +200,7 @@ async function decode(lnm, tokens, globals, io) {
                 if (!dependents) dependents = new Set();
                 let compiledExpression = await compileExpression(lnm, printExpression, io, dependents); // splice the expression to compile out
 
-                let inputToken = {"type": "INPUT", "line": lnm, "expression": compiledExpression, "var": variable.value, "index": indexExpression};
+                let inputToken = {"type": "INPUT", "line": lnm, "expression": compiledExpression, "var": variable, "index": indexExpression};
 
                 return [
                     assertVariablesExist(lnm, dependents),
