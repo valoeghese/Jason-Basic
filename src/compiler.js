@@ -124,28 +124,36 @@ async function decode(lnm, tokens, globals, io) {
             case "PRINT":
                 if (tokens.length === 0) throw exception(lnm, "PRINT requires an operand but none given!");
                 return await simpleExpression(lnm, "PRINT", tokens, io);
-            case "RANDOM":
-                //console.log(expression);
+            case "RANDOM": {
                 if (tokens.length === 0) throw exception(lnm, "RANDOM requires a variable but none given!");
-                if (tokens.length > 1) throw exception(lnm, "Too many operands! RANDOM requires exactly one variable and no other operands.");
-                
-                if (tokens[0].type === "VAR") {
-                    return [{"type": "VAR", "line": lnm, "var": tokens[0].value, "expression": vars => Math.random()}];
-                }
-                else {
-                    throw exception(lnm, "Invalid variable name to store RANDOM value in.")
-                }
-            case "ROUND":
-                if (tokens.length === 0) throw exception(lnm, "ROUND requires a variable but none given!");
-                if (tokens.length > 1) throw exception(lnm, "Too many operands! ROUND requires exactly one variable and no other operands.");
 
-                if (tokens[0].type === "VAR") {
-                    return [{"type": "VAR", "line": lnm, "var": tokens[0].value, "expression": vars => Math.round(vars[tokens[0].value])}];
+                // need var to start. readVarTarget already checks that
+                const [variable, indexExpression, dependents] = await readVarTarget(lnm, tokens.shift(), tokens, io);
+
+                if (tokens.length > 0) { // tokens should be consumed
+                    throw exception(lnm, "Too many operands! RANDOM requires exactly one target and no other operands.");
                 }
-                else {
-                    throw exception(lnm, "Invalid variable name to perform ROUND operation on.")
+
+                const assignFactory = assignVarTarget(lnm, variable, indexExpression);
+                return assignFactory(vars => Math.random(), dependents ?? new Set());
+            } case "ROUND": {
+                if (tokens.length === 0) throw exception(lnm, "ROUND requires a variable but none given!");
+                
+                // need var to start. readVarTarget already checks that
+                const [variable, indexExpression, ixDependents] = await readVarTarget(lnm, tokens.shift(), tokens, io);
+
+                if (tokens.length > 0) { // tokens should be consumed
+                    throw exception(lnm, "Too many operands! ROUND requires exactly one target and no other operands.");
                 }
-            case "LOWERCASE":
+
+                const assignFactory = assignVarTarget(lnm, variable, indexExpression);
+                
+                if (indexExpression) {
+                    return assignFactory(vars => Math.round(vars[variable][indexExpression(vars)]), ixDependents);
+                } else {
+                    return assignFactory(vars => Math.round(vars[variable]), new Set());
+                }
+            } case "LOWERCASE":
                 if (tokens.length === 0) throw exception(lnm, "LOWERCASE requires a variable but none given!");
                 if (tokens.length > 1) throw exception(lnm, "Too many operands! LOWERCASE requires exactly one variable and no other operands.");
 
