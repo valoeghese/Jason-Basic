@@ -102,7 +102,7 @@ async function tokenise(lnm, expression, keywords) {
 		let ptr = 0;
 		let tokens = [];
 
-		while (ptr < expression.length) {
+		tokeniserLoop: while (ptr < expression.length) {
 			for (let id in HANDLERS) {
 				const handler = HANDLERS[id];
 				const response = handler(expression, ptr);
@@ -117,8 +117,11 @@ async function tokenise(lnm, expression, keywords) {
 
 					if (token.type) tokens.push(token);
 					ptr = newPtr;
+					continue tokeniserLoop; //handled. move on to handling next thing
 				}
 			}
+
+			throw tokeniserError(`Unexpected character ${expression[ptr]}`);
 		}
 
 		// var -> keyword
