@@ -2,53 +2,36 @@ dj/msg
 // Initial Variables
 // You do have to change the printFinalInt function as I can't figure out how to dynamically create variables, but changing this is just the number of times the generateInt loop iterates
 digits = 8
+
 // i is just for counters
 i = 0
+
+// this is used to print the final number as a string
+number = ""
+
 // array for all digits generated, to the length of digits specified
 DIM digitArray digits
 
 // this loop generates either a 0 or 1 for each digit in the array
-GENERATE_INT:
-    // a placeholder variable is needed for each digit in the array to get around missing functionality in DJ Basic
-    digit = digitArray(i)
+generateInt:
     // generate a random number from 0 to 1 (including decimals)
-    RANDOM digit
+    RANDOM digitArray(i)
     // round this to 0 or 1
-    ROUND digit
+    ROUND digitArray(i)
     // This converts the digit to a string
-    UPPERCASE digit
-    // transfer the value in the temporary digit back into the array at value i
-    digitArray(i) = digit
-    // debug - uncomment the line below to see each digit printed line per line
-    // PRINT "This is digitArray at index " + i + ": " + digitArray(i)
+    UPPERCASE digitArray(i)
 
     i = i + 1
 
     // logic to end loop
     IF i < digits
-        GOTO GENERATE_INT
-    ELSE
-        GOTO PRINT_FINAL_INT
-    END IF
+        GOTO generateInt
+    END If
 
-// hardcoded since no dynamic variables
-PRINT_FINAL_INT:
-i = 0
-digit1 = digitArray(i)
-i = i+1
-digit2 = digitArray(i)
-i = i+1
-digit3 = digitArray(i)
-i = i+1
-digit4 = digitArray(i)
-i = i+1
-digit5 = digitArray(i)
-i = i+1
-digit6 = digitArray(i)
-i = i+1
-digit7 = digitArray(i)
-i = i+1
-digit8 = digitArray(i)
+// Gather each value of the digitArray array and concatenate them all together into one string in number, using a for loop :fire:
+FOR i IN digitArray
+    number = number + i
+END FOR
 
-// :/
-PRINT digit1 + digit2 + digit3 + digit4 + digit5 + digit6 + digit7 + digit8
+// print said value
+PRINT number
