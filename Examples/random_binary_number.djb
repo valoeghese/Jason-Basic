@@ -25,7 +25,7 @@ generateInt:
     // logic to end loop
     IF i < digits
         GOTO generateInt
-    END If
+    END IF
 
 // Gather each value of the digitArray array and concatenate them all together into one string in number, using a for loop :fire:
 FOR i IN digitArray
