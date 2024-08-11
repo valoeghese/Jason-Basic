@@ -1,4 +1,3 @@
-dj/msg
 // Initial Variables
 // You do have to change the printFinalInt function as I can't figure out how to dynamically create variables, but changing this is just the number of times the generateInt loop iterates
 digits = 8
