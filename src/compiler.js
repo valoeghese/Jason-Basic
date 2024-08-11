@@ -258,7 +258,7 @@ async function decode(lnm, tokens, globals, io) {
                 if (iterated.type != "VAR") throw exception(lnm, "FOR array variable is not a valid variable name!");
 
                 // numerical iterator name
-                const forId = globals.forId++;
+                const forId = globals.forid++;
                 let forIterVarName = `@FOR_I${forId}`;
                 
                 // create jump
