@@ -85,7 +85,7 @@ const IDENTIFIER_REGEX = /[A-Za-z_][A-Za-z0-9_]*/;
 
 const BRACKETS_OPERATORS_REGEX = /[\(\)\+\-\*\/\!\&\|\=\>\<\%]/;
 const SEPARATORS_REGEX = /,/;
-const NUMBERS_REGEX = /[0-9]+/;
+const NUMBERS_REGEX = /[0-9]+(\.[0-9]+)?/;
 
 // Define the handlers, in priority order
 const HANDLERS = [
