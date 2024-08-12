@@ -432,7 +432,9 @@ function compileExpressionComponent(lnm, tokens, io, dependents, depth = 0) {
 
 				// decrease depth
 				return jsExpression; // READERS NOTE EARLY RETURN HERE!!
-			} else {
+			} else if (token.value === "/=") {
+                jsExpression += "!==";
+            } else {
 				jsExpression += token.value;
 			}
 		}

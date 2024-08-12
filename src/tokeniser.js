@@ -83,7 +83,7 @@ function createRegexParser(regex, type) {
 
 const IDENTIFIER_REGEX = /[A-Za-z_][A-Za-z0-9_]*/;
 
-const BRACKETS_OPERATORS_REGEX = /<=|>=|[\(\)\+\-\*\/\!\&\|\=\>\<\%]/;
+const BRACKETS_OPERATORS_REGEX = /<=|>=|\/=|[\(\)\+\-\*\/\!\&\|\=\>\<\%]/;
 const SEPARATORS_REGEX = /,/;
 const NUMBERS_REGEX = /[0-9]+(\.[0-9]+)?/;
 
