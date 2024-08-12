@@ -39,6 +39,7 @@ function parseString(expression, ptr) {
 
 		if (escape) {
 			stringAccumulator += c;
+			escape = false;
 		} else if (c == "\"") {
 			return [{
 				"type": TYPE_STRING,
