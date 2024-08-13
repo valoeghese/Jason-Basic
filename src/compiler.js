@@ -4,6 +4,7 @@ const KEYWORDS = [
     "GOTO", "IF", "ELSE", "END", "WHILE", "FOR", "IN",
     "RANDOM", "DIM",
     "ROUND", "FLOOR", "SQRT",
+    "SIN", "SINH", "ASIN", "COS", "COSH", "ACOS", "TAN", "ATAN",
     "LOWERCASE", "UPPERCASE", "TONUMBER", "MATCH",
     "REM"];
 
@@ -136,10 +137,20 @@ async function decode(lnm, tokens, globals, io) {
                 return await transformExpression(lnm, "SQRT", tokens, io, old => Math.sqrt(old));
             case "SIN":
                 return await transformExpression(lnm, "SIN", tokens, io, old => Math.sin(old));
+            case "SINH":
+                return await transformExpression(lnm, "SINH", tokens, io, old => Math.sinh(old));
+            case "ASIN":
+                return await transformExpression(lnm, "ASIN", tokens, io, old => Math.asin(old));
             case "COS":
                 return await transformExpression(lnm, "COS", tokens, io, old => Math.cos(old));
             case "COSH":
                 return await transformExpression(lnm, "COSH", tokens, io, old => Math.cosh(old));
+            case "ACOS":
+                return await transformExpression(lnm, "ACOS", tokens, io, old => Math.acos(old));
+            case "TAN":
+                return await transformExpression(lnm, "TAN", tokens, io, old => Math.tan(old));
+            case "ATAN":
+                return await transformExpression(lnm, "ATAN", tokens, io, old => Math.atan(old));
             case "LOWERCASE":
                 return await transformExpression(lnm, "LOWERCASE", tokens, io, old => old.toString().toLowerCase());
             case "UPPERCASE":
