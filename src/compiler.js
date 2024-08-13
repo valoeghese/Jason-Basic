@@ -3,7 +3,8 @@ const KEYWORDS = [
     "PRINT", "INPUT", "TO",
     "GOTO", "IF", "ELSE", "END", "WHILE", "FOR", "IN",
     "RANDOM", "DIM",
-    "ROUND", "LOWERCASE", "UPPERCASE", "TONUMBER", "MATCH",
+    "ROUND", "FLOOR", "SQRT",
+    "LOWERCASE", "UPPERCASE", "TONUMBER", "MATCH",
     "REM"];
 
 function exception(lineNum, msg) {
@@ -129,6 +130,10 @@ async function decode(lnm, tokens, globals, io) {
                 return await transformExpression(lnm, "RANDOM", tokens, io, old => Math.random());
             case "ROUND":
                 return await transformExpression(lnm, "ROUND", tokens, io, old => Math.round(old));
+            case "FLOOR":
+                return await transformExpression(lnm, "FLOOR", tokens, io, old => Math.floor(old));
+            case "SQRT":
+                return await transformExpression(lnm, "SQRT", tokens, io, old => Math.sqrt(old));
             case "LOWERCASE":
                 return await transformExpression(lnm, "LOWERCASE", tokens, io, old => old.toString().toLowerCase());
             case "UPPERCASE":
