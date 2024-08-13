@@ -134,6 +134,12 @@ async function decode(lnm, tokens, globals, io) {
                 return await transformExpression(lnm, "FLOOR", tokens, io, old => Math.floor(old));
             case "SQRT":
                 return await transformExpression(lnm, "SQRT", tokens, io, old => Math.sqrt(old));
+            case "SIN":
+                return await transformExpression(lnm, "SIN", tokens, io, old => Math.sin(old));
+            case "COS":
+                return await transformExpression(lnm, "COS", tokens, io, old => Math.cos(old));
+            case "COSH":
+                return await transformExpression(lnm, "COSH", tokens, io, old => Math.cosh(old));
             case "LOWERCASE":
                 return await transformExpression(lnm, "LOWERCASE", tokens, io, old => old.toString().toLowerCase());
             case "UPPERCASE":
