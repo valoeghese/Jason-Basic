@@ -425,7 +425,7 @@ async function decode(lnm, tokens, globals, io) {
                 args = [];
                 if (tokens.length > 1) {
                     for (var i = 1; i < tokens.length; i++) {
-                        define = define.replace("{{" + i + "}}", tokens[i].value);
+                        define = define.replaceAll("{{" + i + "}}", tokens[i].value);
                     }
                 }
                 return define;
