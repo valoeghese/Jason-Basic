@@ -61,8 +61,17 @@ async function run(procedure, io, variables) {
 		} else {
             let tokens = await tokeniser.tokenise(lnm, line, compiler.KEYWORDS);
 			// Debug Tokeniser: io.out(tokens.map(value => `${value.type}:${value.value}`).join(" "));
-			let decoded = await compiler.decode(lnm, tokens, decode_Globals, io); // decode into list of instructions
-			instructions.push(...decoded); // append
+			let decoded = await compiler.decode(lnm, tokens, decode_Globals, io); // decode into list of instructions and "preproccsor" generated lines
+			if (typeof decoded === "string") {
+				// this is bad :(
+				new_lines = decoded.split("\\n");
+				if (new_lines != undefined) {
+					// we don't allow recursive macros so that compilation always halts, C does this so its probably fine.
+					procedure.splice(i + 1, 0, ...new_lines);
+				}
+			} else {
+				instructions.push(...decoded); // append
+			}
         }
 
 		i++; // increment index

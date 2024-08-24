@@ -6,7 +6,8 @@ const KEYWORDS = [
     "ROUND", "FLOOR", "SQRT",
     "SIN", "SINH", "ASIN", "COS", "COSH", "ACOS", "TAN", "ATAN",
     "LOWERCASE", "UPPERCASE", "TONUMBER", "MATCH",
-    "REM"];
+    "REM", 
+    "DEFINE", "EXPAND"];
 
 function exception(lineNum, msg) {
 	return "Syntax Error at line " + lineNum + ":\n>> " + msg;
@@ -90,13 +91,14 @@ function assignVarTarget(lnm, variable, indexExpression) {
 // - tokens = the tokens to parse
 // - globals (READ/WRITE) = a map shared across the compilation of a procedure, to keep track of state
 // Returns
-// - the parsed executable instructions for this line
+// - the parsed executable instructions for this line or a string of extra lines to parse
 async function decode(lnm, tokens, globals, io) {
 	// initialise globals if first time
 	if (globals.blockstack == undefined) globals.blockstack = []; // if/while/for stack
 	if (globals.ifid == undefined) globals.ifid = 0; // free if id tracker, for sections. To ensure unique names.
 	if (globals.whileid == undefined) globals.whileid = 0; // free while id tracker, for sections. To ensure unique names.
 	if (globals.forid == undefined) globals.forid = 0; // free for id tracker, for sections. To ensure unique names.
+	if (globals.defines == undefined) globals.defines = {}; // For preproccesor macros
 
 	let head = tokens.shift(); // remove first token
     
@@ -400,6 +402,33 @@ async function decode(lnm, tokens, globals, io) {
                     default:
                         throw exception(lnm, "This should be unreachable. Contact @Valoeghese if you see this.");
                 }
+            case "DEFINE":
+                // DEFINE is a bit special since its a preproccesor and not real code
+                if (tokens.length !== 2) {
+                    throw exception(lnm, "DEFINE not of form DEFINE name evaulation!");
+                }
+                if (tokens[0].type !== "VAR") {
+                    throw exception(lnm, "DEFINE name is not a name!");
+                }
+                if (tokens[1].type !== "STRING") {
+                    throw exception(lnm, "DEFINE value is not a string!");
+                }
+                globals.defines[tokens[0].value] = tokens[1].value;
+                globals.defines["hi"] = "hello";
+                return [];
+            case "EXPAND":
+                if (tokens.length === 0) {
+                    throw exception(lnm, "EXPAND doesn't have define name to expand!");
+                }
+                name = tokens[0].value;
+                define = globals.defines[name];
+                args = [];
+                if (tokens.length > 1) {
+                    for (var i = 1; i < tokens.length; i++) {
+                        define = define.replace("{{" + i + "}}", tokens[i].value);
+                    }
+                }
+                return define;
             default: // catch-all
                 throw exception(lnm, "Unable to parse line starting with token \""  + `${head.value} (${head.type.toLowerCase()})` + "\"" + "... is this correct syntax for DJ BASIC?");
         }
