@@ -104,9 +104,9 @@ END
 
 Most things exist. 
 
-Arithmetic: `+`, `-`, `*`, `/`, `%`
+Arithmetic: `+`, `-`, `*`, `/`, `%`, `**`
 Brackets: `(` `)`
-Boolean: `!` `&` `|`
+Boolean: `!` `&` `|` `^`
 Comparison: `<` `>` `<=` `>=` `=`
 
 Yep that's right folks. Single equals for both assign and compare.
@@ -153,6 +153,16 @@ Round the number in the given variable.
 TONUMBER (variable name)
 ```
 Convert the variable to a number. The current implementation follows javascript rules, but may get more strict in future releases. Please treat non-numeric values as undefined behaviour and handle your input carefully.
+
+```
+SIN (variable name)
+```
+Take the sine of the variable and store it in the variable. Other mathematical functions available: `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN`, `SINH`, `COSH`, `SQRT`
+
+## Preprocessor Macros
+This section is a stub. Please help Jason Basic by expanding it!
+`DEFINE`
+`EXPAND`
 
 ## Breakpoints
 Put * at the end of a line to make it print the values of every variable before every time it runs that line.
