@@ -1,4 +1,5 @@
 const tokeniser = require("./tokeniser.js");
+const preprocessor = require("./preprocessor.js");
 const compiler = require("./compiler.js");
 
 const LABEL_REGEX = /[A-z0-9 ]+/;
@@ -30,11 +31,13 @@ async function run(procedure, io, variables) {
 		return result;
 	}
 
+	let lnm = 1; // the actual line number. will differ slightly from i. substantially if macros are used.
+	let spaghetti_stop_lnm_increment = 0; // number of lines to skip lnm increment
+
 	while (i < procedure.length) {
 		//console.log(i + 1, " ", procedure[i]);
 		let line = procedure[i].trim();
-        let lnm = i + 1; // the actual line number
-
+        
 		// handle breakpoints first. done by placing * at the end of a line. breaks BEFORE the line.
 		if (line[line.length - 1] == '*') {
 			instructions.push({"type": "INPUT_DISCARD", "line": lnm, "expression": vars => "Breakpoint @ line " + (lnm) + ", " + vars2str(vars)});
@@ -59,21 +62,31 @@ async function run(procedure, io, variables) {
                 throw exception(lnm, "Invalid label \"" + labelName + "\". Only A-z, 0-9, and space characters are permitted!")
             }
 		} else {
-            let tokens = await tokeniser.tokenise(lnm, line, compiler.KEYWORDS);
+			let tokens = await tokeniser.tokenise(lnm, line, compiler.KEYWORDS);
 			// Debug Tokeniser: io.out(tokens.map(value => `${value.type}:${value.value}`).join(" "));
-			let decoded = await compiler.decode(lnm, tokens, decode_Globals, io); // decode into list of instructions and "preproccsor" generated lines
-			if (typeof decoded === "string") {
+			let preprocessed = await preprocessor.preProcess(lnm, tokens, decode_Globals, compiler.KEYWORDS);
+
+			if (preprocessed !== null) {
 				// this is bad :(
-				new_lines = decoded.split("\\n");
+				new_lines = preprocessed.length === 0 ? undefined : preprocessed.split("\\n");
 				if (new_lines != undefined) {
 					// we don't allow recursive macros so that compilation always halts, C does this so its probably fine.
 					procedure.splice(i + 1, 0, ...new_lines);
+					spaghetti_stop_lnm_increment += new_lines.length;
 				}
+				// DONT increment lnm
 			} else {
+				let decoded = await compiler.decode(lnm, tokens, decode_Globals, io); // decode into list of instructions and "preproccsor" generated lines
 				instructions.push(...decoded); // append
 			}
         }
 
+		if (spaghetti_stop_lnm_increment > 0) {
+			spaghetti_stop_lnm_increment--; 
+		} else {
+			lnm++;
+		}
+		
 		i++; // increment index
 	}
 

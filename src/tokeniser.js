@@ -6,6 +6,7 @@ const TYPE_SEPARATOR = "SEPARATOR";
 const TYPE_NUMBER = "NUMBER";
 const TYPE_STRING = "STRING";
 const TYPE_VAR = "VAR";
+const TYPE_PREPROCESSOR = "PREPROCESSOR";
 const TYPE_KEYWORD = "KEYWORD";
 
 ///// Utility Functions /////
@@ -81,7 +82,8 @@ function createRegexParser(regex, type) {
 	};
 }
 
-const IDENTIFIER_REGEX = /[A-Za-z_][A-Za-z0-9_]*/;
+const IDENTIFIER_REGEX   = /[A-Za-z_][A-Za-z0-9_]*/;
+const P_IDENTIFIER_REGEX = /:[A-Za-z_][A-Za-z0-9_]*/;
 
 const BRACKETS_OPERATORS_REGEX = /<=|>=|\/=|\*\*|[\(\)\+\-\*\/\!\&\|\^\=\>\<\%]/;
 const SEPARATORS_REGEX = /,/;
@@ -91,6 +93,7 @@ const NUMBERS_REGEX = /[0-9]+(\.[0-9]+)?/;
 const HANDLERS = [
 	createRegexParser(/\s+/, null), // whitespace consumer
 	parseString,
+	createRegexParser(P_IDENTIFIER_REGEX, TYPE_PREPROCESSOR),
 	createRegexParser(IDENTIFIER_REGEX, TYPE_VAR),
 	createRegexParser(BRACKETS_OPERATORS_REGEX, TYPE_OPERATOR),
 	createRegexParser(SEPARATORS_REGEX, TYPE_SEPARATOR),
