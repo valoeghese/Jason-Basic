@@ -1,11 +1,35 @@
 const MAX_DEPTH = 42;
+
+// built in functions with 1 input and 1 output
+const BUILTINS = {
+    "ROUND": old => Math.round(old),
+    "FLOOR": old => Math.floor(old),
+    "SQRT": old => Math.sqrt(old),
+    // Trig and Hyperbolic Trig
+    "SIN":   old => Math.sin(old),
+    "SINH":  old => Math.sinh(old),
+    "ASIN":  old => Math.asin(old),
+    "ASINH": old => Math.asinh(old),
+    "COS":   old => Math.cos(old),
+    "COSH":  old => Math.cosh(old),
+    "ACOS":  old => Math.acos(old),
+    "ACOSH": old => Math.acosh(old),
+    "TAN":   old => Math.tan(old),
+    "TANH":  old => Math.tanh(old),
+    "ATAN":  old => Math.atan(old),
+    "ATANH": old => Math.atanh(old),
+    // Conversion
+    "LOWERCASE": old => old.toString().toLowerCase(),
+    "UPPERCASE": old => old.toString().toUpperCase(),
+    "TONUMBER":  old => parseFloat(old)
+}
+
 const KEYWORDS = [
     "PRINT", "INPUT", "TO",
     "GOTO", "IF", "ELSE", "END", "WHILE", "FOR", "IN",
     "RANDOM", "DIM",
-    "ROUND", "FLOOR", "SQRT",
-    "SIN", "SINH", "ASIN", "COS", "COSH", "ACOS", "TAN", "ATAN",
-    "LOWERCASE", "UPPERCASE", "TONUMBER", "MATCH",
+    ...Object.keys(BUILTINS),
+    "MATCH",
     "REM"];
 
 function exception(lineNum, msg) {
@@ -123,40 +147,16 @@ async function decode(lnm, tokens, globals, io) {
     }
     else if (head.type === "KEYWORD") {
         // Instructions are case sensitive
-        switch (head.value) {
+        if (BUILTINS[head.value]) {
+            // apply the transform designated in the builtin
+            return await transformExpression(lnm, head.value, tokens, io, BUILTINS[head.value]);
+        }
+        else switch (head.value) {
             case "PRINT":
                 if (tokens.length === 0) throw exception(lnm, "PRINT requires an operand but none given!");
                 return await simpleExpression(lnm, "PRINT", tokens, io);
             case "RANDOM":
                 return await transformExpression(lnm, "RANDOM", tokens, io, old => Math.random());
-            case "ROUND":
-                return await transformExpression(lnm, "ROUND", tokens, io, old => Math.round(old));
-            case "FLOOR":
-                return await transformExpression(lnm, "FLOOR", tokens, io, old => Math.floor(old));
-            case "SQRT":
-                return await transformExpression(lnm, "SQRT", tokens, io, old => Math.sqrt(old));
-            case "SIN":
-                return await transformExpression(lnm, "SIN", tokens, io, old => Math.sin(old));
-            case "SINH":
-                return await transformExpression(lnm, "SINH", tokens, io, old => Math.sinh(old));
-            case "ASIN":
-                return await transformExpression(lnm, "ASIN", tokens, io, old => Math.asin(old));
-            case "COS":
-                return await transformExpression(lnm, "COS", tokens, io, old => Math.cos(old));
-            case "COSH":
-                return await transformExpression(lnm, "COSH", tokens, io, old => Math.cosh(old));
-            case "ACOS":
-                return await transformExpression(lnm, "ACOS", tokens, io, old => Math.acos(old));
-            case "TAN":
-                return await transformExpression(lnm, "TAN", tokens, io, old => Math.tan(old));
-            case "ATAN":
-                return await transformExpression(lnm, "ATAN", tokens, io, old => Math.atan(old));
-            case "LOWERCASE":
-                return await transformExpression(lnm, "LOWERCASE", tokens, io, old => old.toString().toLowerCase());
-            case "UPPERCASE":
-                return await transformExpression(lnm, "UPPERCASE", tokens, io, old => old.toString().toUpperCase());
-            case "TONUMBER":
-                return await transformExpression(lnm, "TONUMBER", tokens, io, old => parseFloat(old));
                 // TODO regex MATCH
             case "DIM": {
                 if (tokens.length < 2) throw exception(lnm, "DIM requires a variable name and a size expression.");
