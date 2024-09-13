@@ -438,7 +438,27 @@ function compileExpressionComponent(lnm, tokens, io, dependents, depth = 0) {
 
 		// keywords that are allowed inline must be handled before expression translation
 		if (token.type == "KEYWORD") {
-			throw exception(lnm, "Unexpected keyword \"" + token.value + '"');
+            if (BUILTINS[token.value]) {
+                if (tokens.length == 0) {
+                    throw exception(lnm, `Expected argument for builtin function ${token.value}`);
+                }
+
+                let applied = tokens.shift();
+                // TODO maybe these functions could verify their operands (e.g. round expects int -- but UPPERCASE/LOWERCASE double as f2s)
+                
+                // apply builtin
+                if (["STRING", "VAR", "NUMBER"].includes(applied.type)) {
+                    // avoid duplicating code by reusing compileExpressionComponent to compile `applied`
+                    jsExpression += `BUILTINS["${token.value}"](${compileExpressionComponent(lnm, [applied], io, dependents, 0)})`;
+                }
+                else if (applied.type === "OPERATOR" && applied.value === '(') {
+                    jsExpression += `BUILTINS["${token.value}"](${compileExpressionComponent(lnm, tokens, io, dependents, depth + 1)})`
+                }
+                else {
+                    throw exception(lnm, `Unexpected argument of type "${applied.type}" (${applied.value})"`);
+                }
+            }
+            else throw exception(lnm, "Unexpected keyword \"" + token.value + '"');
 		}
 		else if (token.type == "OPERATOR") {
 			if (token.value.length == 1 && /[\&\|\=]/.test(token.value)) {
